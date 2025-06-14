@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: gitlab-repo-creator-config
 data:
-  NAMESPACE_MAP: '{"app-emerald":8858,"app-integration":8860,"app-nexus":8861,"app-premium-billing":8859,"app-shared-services":8862}'
-  TEMPLATE_MAP: '{"embark-go-image":27440,"embark-go-library":27453,"embark-java-image":27462,"embark-java-image-kjar":27463,"embark-java-library":27464,"embark-javascript-image":27468,"embark-javascript-library":27469}'
+  NAMESPACE_MAP: '{"<Project-name>":<Project-id>,"<Project-name>":<Project-id>}'
+  TEMPLATE_MAP: '{"<template-name>":<template-id>,"<template-name>":<template-id>}'
