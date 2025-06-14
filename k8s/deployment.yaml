@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-repo-creator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-repo-creator
+  template:
+    metadata:
+      labels:
+        app: gitlab-repo-creator
+    spec:
+      containers:
+      - name: gitlab-repo-creator
+        image: your-docker-repo/gitlab-repo-creator:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: gitlab-repo-creator-config
+        - secretRef:
+            name: gitlab-repo-creator-secret

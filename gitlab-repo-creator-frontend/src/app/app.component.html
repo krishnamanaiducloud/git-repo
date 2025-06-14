@@ -1,0 +1,75 @@
+<div class="container mt-5">
+  <h1 class="text-center mb-4">GitLab Repo Creator</h1>
+
+  <!-- Show success message if project was created -->
+  <div *ngIf="createdProjectUrl; else formTemplate">
+    <div class="alert alert-success">
+      <h4 class="alert-heading">Repository Created Successfully!</h4>
+      <p>You can access it here:</p>
+      <p>
+        <a [href]="createdProjectUrl" target="_blank">{{ createdProjectUrl }}</a>
+      </p>
+      <button class="btn btn-primary mt-3" (click)="resetForm()">Create Another Repository</button>
+    </div>
+  </div>
+
+  <!-- Form template -->
+  <ng-template #formTemplate>
+    <h3 class="mb-3">Create New Repository</h3>
+    <p class="mb-4 text-muted">Fill in the details below to create a new GitLab repository using predefined templates.</p>
+
+    <!-- Modern Progress Loader with Angular Material -->
+    <div *ngIf="progress > 0 && progress < 100" class="d-flex flex-column align-items-center my-4">
+      <mat-progress-spinner
+        mode="determinate"
+        [value]="progress"
+        diameter="80"
+        strokeWidth="8"
+        color="primary">
+      </mat-progress-spinner>
+
+      <div class="h4 mt-3">{{ progress }}% Completed</div>
+    </div>
+
+    <!-- Form -->
+    <form (ngSubmit)="submitForm()" [formGroup]="form">
+      <div class="form-group">
+        <label>Project Name *</label>
+        <input type="text" formControlName="projectName" class="form-control" placeholder="e.g. my-awesome-project" required />
+        <small class="form-text text-muted">Only letters, numbers, hyphens, and underscores allowed</small>
+      </div>
+
+      <div class="form-group mt-3">
+        <label>Application Sub-group *</label>
+        <select formControlName="subgroup" class="form-control" required>
+          <option value="">Select an application sub-group</option>
+          <option *ngFor="let group of subgroups" [value]="group.value">{{ group.label }}</option>
+        </select>
+      </div>
+
+      <div class="form-group mt-3">
+        <label>Technology *</label>
+        <select formControlName="technology" class="form-control" required (change)="onTechnologyChange(form.controls['technology'].value)">
+          <option value="">Select a technology</option>
+          <option *ngFor="let tech of technologies" [value]="tech">{{ tech }}</option>
+        </select>
+      </div>
+
+      <div class="form-group mt-3">
+        <label>Artifact Type *</label>
+        <select formControlName="artifactType" class="form-control" required>
+          <option value="">Select an artifact type</option>
+          <option *ngFor="let type of artifactTypes" [value]="type">{{ type }}</option>
+        </select>
+      </div>
+
+      <div class="form-group mt-3">
+        <label>Owner Info (optional)</label>
+        <input type="text" formControlName="ownerInfo" class="form-control" placeholder="john.doe@centene.com or John Doe" />
+      </div>
+
+      <button type="submit" class="btn btn-primary mt-4" [disabled]="progress > 0 && progress < 100">Create Repository</button>
+    </form>
+  </ng-template>
+</div>
+

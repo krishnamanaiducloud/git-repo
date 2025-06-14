@@ -1,0 +1,37 @@
+# Node.js dependencies
+**/node_modules/
+
+# Build output
+dist/
+build/
+public/
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Backup or archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bak
+*.tmp
+
+# Angular cache
+.gitlab-repo-creator-frontend/.angular/cache/
+
