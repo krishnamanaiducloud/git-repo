@@ -1,40 +1,68 @@
-# Stage 1: build frontend
-FROM node:18-alpine AS frontend-build
-WORKDIR /app/frontend
-COPY gitlab-repo-creator-frontend/package.json gitlab-repo-creator-frontend/package-lock.json* ./
-RUN npm install -g @angular/cli@19.1.5 && npm ci || npm install
-COPY gitlab-repo-creator-frontend/ ./
-RUN ng build --configuration production
+# ================================
+# Stage 1: Build Angular Frontend
+# ================================
+FROM node:22-alpine3.22 AS frontend-build
 
-# Stage 2: build backend
-FROM node:18-alpine AS backend-build
+WORKDIR /app/frontend
+
+COPY gitlab-repo-creator-frontend/package*.json ./
+RUN npm ci
+
+COPY gitlab-repo-creator-frontend/ ./
+RUN npm run build
+
+
+# ============================
+# Stage 2: Backend Dependencies
+# ============================
+FROM node:22-alpine3.22 AS backend-build
+
 WORKDIR /app/backend
-# Install git for simple-git
-RUN apk add --no-cache git
-COPY backend/package.json backend/package-lock.json* ./
-RUN npm ci || npm install
+
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
 COPY backend/ ./
 
-# Final stage: serve backend + frontend
-FROM node:18-alpine
-WORKDIR /app
 
-# Install git in final stage as well, since simple-git runs at runtime in index.js
-RUN apk add --no-cache git
+# ==================================
+# Stage 3: Final Runtime Image
+# ==================================
+FROM node:22-alpine3.22
 
-# Create non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+# Install git + CA certs + curl
+RUN apk add --no-cache git openssh ca-certificates curl
 
-# Copy frontend build output
-COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend /app/public
+WORKDIR /app/backend
 
-# Copy backend code
-COPY --from=backend-build /app/backend /app
+# Copy backend
+COPY --from=backend-build /app/backend ./
 
-# Expose port
+# Copy Angular build into backend/public/browser
+RUN mkdir -p ./public/browser
+COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend/browser ./public/browser
+
+# =====================================================
+#   OpenShift Compatibility: Allow Arbitrary UID
+# =====================================================
+# - OpenShift assigns a random UID (e.g. 1000710000)
+# - Container MUST run without specifying USER
+# - Files must be group-writable and owned by root group (0)
+# =====================================================
+
+RUN chgrp -R 0 /app && chmod -R g+rwX /app/backend && chmod -R g+rwX /app
+
+# IMPORTANT: Do NOT add USER instruction!
+# OpenShift will supply a random non-root UID automatically.
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
 EXPOSE 3000
 
-# Start backend server
-CMD ["npm", "start"]
+# HEALTHCHECK for Trivy & Kubernetes
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:3000/api/config/subgroups || exit 1
+
+CMD ["node", "index.js"]
 
