@@ -1,0 +1,68 @@
+# ================================
+# Stage 1: Build Angular Frontend
+# ================================
+FROM node:22-alpine3.22 AS frontend-build
+RUN apk update && apk upgrade --no-cache
+WORKDIR /app/frontend
+
+COPY gitlab-repo-creator-frontend/package*.json ./
+RUN npm ci
+
+COPY gitlab-repo-creator-frontend/ ./
+RUN npm run build
+
+
+# ============================
+# Stage 2: Backend Dependencies
+# ============================
+FROM node:22-alpine3.22 AS backend-build
+RUN apk update && apk upgrade --no-cache
+WORKDIR /app/backend
+
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
+COPY backend/ ./
+
+
+# ==================================
+# Stage 3: Final Runtime Image
+# ==================================
+FROM node:22-alpine3.22
+RUN apk update && apk upgrade --no-cache
+# Install git + CA certs + curl
+RUN apk add --no-cache git openssh ca-certificates curl
+
+WORKDIR /app/backend
+
+# Copy backend
+COPY --from=backend-build /app/backend ./
+
+# Copy Angular build into backend/public/browser
+RUN mkdir -p ./public/browser
+COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend/browser ./public/browser
+
+# =====================================================
+#   OpenShift Compatibility: Allow Arbitrary UID
+# =====================================================
+# - OpenShift assigns a random UID (e.g. 1000710000)
+# - Container MUST run without specifying USER
+# - Files must be group-writable and owned by root group (0)
+# =====================================================
+
+RUN chgrp -R 0 /app && chmod -R g+rwX /app/backend && chmod -R g+rwX /app
+
+# IMPORTANT: Do NOT add USER instruction!
+# OpenShift will supply a random non-root UID automatically.
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+# HEALTHCHECK for Trivy & Kubernetes
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:3000/api/config/subgroups || exit 1
+
+CMD ["node", "index.js"]
+

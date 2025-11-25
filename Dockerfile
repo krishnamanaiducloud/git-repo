@@ -1,66 +1,57 @@
 # ================================
-# Stage 1: Build Angular Frontend
+# Stage 1: Build (Node + npm lives here)
 # ================================
-FROM node:22-alpine3.22 AS frontend-build
+FROM node:25.2.1-alpine3.22 AS build
 
+# Fix BusyBox CVEs in build stage
+RUN apk update && apk upgrade --no-cache
+
+WORKDIR /app
+
+# Backend deps
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
+RUN npm ci --omit=dev
+
+# Frontend deps + build
 WORKDIR /app/frontend
-
 COPY gitlab-repo-creator-frontend/package*.json ./
 RUN npm ci
-
 COPY gitlab-repo-creator-frontend/ ./
 RUN npm run build
 
-
-# ============================
-# Stage 2: Backend Dependencies
-# ============================
-FROM node:22-alpine3.22 AS backend-build
-
+# Go back and copy backend source
 WORKDIR /app/backend
-
-COPY backend/package*.json ./
-RUN npm ci --omit=dev
-
 COPY backend/ ./
 
+# ================================
+# Stage 2: Runtime (no npm, no node-pkg CVEs)
+# ================================
+FROM alpine:3.22
 
-# ==================================
-# Stage 3: Final Runtime Image
-# ==================================
-FROM node:22-alpine3.22
+# Fix BusyBox CVEs in runtime
+RUN apk update && apk upgrade --no-cache \
+    && apk add --no-cache nodejs curl ca-certificates \
+    && rm -rf /var/cache/apk/*
 
-# Install git + CA certs + curl
-RUN apk add --no-cache git openssh ca-certificates curl
+# IMPORTANT: we install only nodejs, NOT npm
+# so no global npm tree → no node-pkg scanner hits on npm’s glob/tar.
 
 WORKDIR /app/backend
 
-# Copy backend
-COPY --from=backend-build /app/backend ./
-
-# Copy Angular build into backend/public/browser
+# Copy built backend + frontend from build stage
+COPY --from=build /app/backend ./
 RUN mkdir -p ./public/browser
-COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend/browser ./public/browser
+COPY --from=build /app/frontend/dist/gitlab-repo-creator-frontend/browser ./public/browser
 
-# =====================================================
-#   OpenShift Compatibility: Allow Arbitrary UID
-# =====================================================
-# - OpenShift assigns a random UID (e.g. 1000710000)
-# - Container MUST run without specifying USER
-# - Files must be group-writable and owned by root group (0)
-# =====================================================
-
-RUN chgrp -R 0 /app && chmod -R g+rwX /app/backend && chmod -R g+rwX /app
-
-# IMPORTANT: Do NOT add USER instruction!
-# OpenShift will supply a random non-root UID automatically.
+# OpenShift-style permissions
+RUN chgrp -R 0 /app && chmod -R g+rwX /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
-# HEALTHCHECK for Trivy & Kubernetes
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:3000/api/config/subgroups || exit 1
 
