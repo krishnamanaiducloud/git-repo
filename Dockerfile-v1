@@ -1,9 +1,9 @@
 # Stage 1: build frontend
 FROM node:18-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY gitlab-repo-creator-frontend/package.json gitlab-repo-creator-frontend/package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install -g @angular/cli@19.1.5 && npm ci || npm install
-COPY gitlab-repo-creator-frontend/ ./
+COPY frontend/ ./
 RUN ng build --configuration production
 
 # Stage 2: build backend
@@ -27,7 +27,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 # Copy frontend build output
-COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend /app/public
+COPY --from=frontend-build /app/frontend/dist/frontend /app/public
 
 # Copy backend code
 COPY --from=backend-build /app/backend /app

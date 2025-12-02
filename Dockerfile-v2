@@ -5,10 +5,10 @@ FROM node:22-alpine3.22 AS frontend-build
 RUN apk update && apk upgrade --no-cache
 WORKDIR /app/frontend
 
-COPY gitlab-repo-creator-frontend/package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci
 
-COPY gitlab-repo-creator-frontend/ ./
+COPY frontend/ ./
 RUN npm run build
 
 
@@ -40,7 +40,7 @@ COPY --from=backend-build /app/backend ./
 
 # Copy Angular build into backend/public/browser
 RUN mkdir -p ./public/browser
-COPY --from=frontend-build /app/frontend/dist/gitlab-repo-creator-frontend/browser ./public/browser
+COPY --from=frontend-build /app/frontend/dist/frontend/browser ./public/browser
 
 # =====================================================
 #   OpenShift Compatibility: Allow Arbitrary UID

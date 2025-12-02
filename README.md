@@ -6,7 +6,7 @@ This project automates GitLab repository creation with a full-stack web interfac
 
 ## 📦 Tech Stack
 
-- **Frontend**: Angular (`gitlab-repo-creator-frontend`)
+- **Frontend**: Angular (`frontend`)
 - **Backend**: Node.js (`backend/`)
 - **Containerization**: Docker (Multi-stage build)
 - **Deployment**: Kubernetes (via manifests in `k8s/` directory)
@@ -18,13 +18,13 @@ This project automates GitLab repository creation with a full-stack web interfac
 ### 1️⃣ Prepare the Frontend
 
 ```bash
-ng new gitlab-repo-creator-frontend --strict --style=scss --routing=false
+ng new frontend --strict --style=scss --routing=false
 # Copy the following into src/app/:
 # - app.component.ts
 # - app.component.html
 # - app.config.ts
 
-cd gitlab-repo-creator-frontend
+cd frontend
 npm install
 ng build --configuration production
 ```
@@ -78,7 +78,7 @@ Replace `<node-ip>` with your actual Kubernetes node IP.
 ```plaintext
 final/
 ├── backend/                        # Node.js backend
-├── gitlab-repo-creator-frontend/  # Angular frontend
+├── frontend/  # Angular frontend
 ├── k8s/                            # Kubernetes manifests
 ├── Dockerfile                      # Multi-stage build
 ├── index.js                        # Optional backend entrypoint

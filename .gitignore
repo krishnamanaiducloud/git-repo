@@ -33,5 +33,5 @@ Thumbs.db
 *.tmp
 
 # Angular cache
-.gitlab-repo-creator-frontend/.angular/cache/
+.frontend/.angular/cache/
 
