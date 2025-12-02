@@ -1,0 +1,76 @@
+# ================================
+# Stage 1: Build Angular + Backend
+# ================================
+FROM node:25.2.1-alpine3.22 AS build
+
+RUN apk update && apk upgrade --no-cache
+
+WORKDIR /app
+
+# ------------------------------
+# Backend Dependencies (npm ci)
+# ------------------------------
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
+RUN npm ci --omit=dev
+
+# ------------------------------
+# Frontend Build (Angular)
+# ------------------------------
+WORKDIR /app/frontend
+COPY frontend/package.json ./
+
+# Frontend has NO package-lock.json → must use npm install
+RUN npm install
+
+COPY frontend/ ./
+
+RUN npm run build -- --configuration production
+
+# ------------------------------
+# Copy backend source code
+# ------------------------------
+WORKDIR /app/backend
+COPY backend/ ./
+
+# ================================
+# Stage 2: Runtime Image
+# ================================
+FROM node:25.2.1-alpine3.22
+
+# Install requirements for simple-git + networking
+RUN apk update && apk upgrade --no-cache \
+    && apk add --no-cache git openssh curl ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app/backend
+
+# Copy backend runtime code
+COPY --from=build /app/backend ./
+
+# Copy Angular build output
+RUN mkdir -p ./public/browser
+COPY --from=build /app/frontend/dist/frontend/browser ./public/browser
+
+# Allow OpenShift arbitrary UID
+RUN chgrp -R 0 /app && chmod -R g+rwX /app
+
+# ---------
+# ENV Vars
+# ---------
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+# ---------------------------
+# HEALTHCHECK (safe, stable)
+# ---------------------------
+# Add the following endpoint in backend:
+#     app.get('/healthz', (req, res) => res.send('ok'));
+#
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:3000/healthz || exit 1
+
+# Start server
+CMD ["node", "index.js"]
