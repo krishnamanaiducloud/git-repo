@@ -1,7 +1,7 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-FROM node:25.2.1-alpine3.22 AS backend-build
+FROM node:25.2.1-alpine3.23 AS backend-build
 
 # If you ever need native builds (bcrypt, etc.) uncomment below:
 # RUN apk add --no-cache python3 make g++
@@ -20,7 +20,7 @@ COPY backend/ ./
 # ===========================================
 # Stage 2: Frontend (Angular) build only
 # ===========================================
-FROM node:25.2.1-alpine3.22 AS frontend-build
+FROM node:25.2.1-alpine3.23 AS frontend-build
 
 WORKDIR /app/frontend
 
@@ -37,7 +37,7 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (what runs in OpenShift)
 # ===========================================
-FROM node:25.2.1-alpine3.22
+FROM node:25.2.1-alpine3.23
 
 # Only the tools needed at runtime
 RUN apk update && apk upgrade --no-cache \
