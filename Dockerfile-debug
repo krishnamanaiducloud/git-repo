@@ -35,32 +35,62 @@ COPY frontend/ ./
 RUN npm run build -- --configuration production
 
 # ===========================================
-# Stage 3: Runtime image (Distroless - Production)
+# Stage 3: Debug Runtime (Alpine with shell for debugging)
 # ===========================================
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM alpine:3.23.3
+
+# Install Node.js runtime + debugging tools
+RUN apk update && apk upgrade --no-cache \
+    && apk add --no-cache \
+        nodejs \
+        git \
+        openssh \
+        curl \
+        ca-certificates \
+        bash \
+        vim \
+        htop \
+    && rm -rf /var/cache/apk/*
 
 # Set environment variables
 ENV NODE_ENV=production \
-    PORT=3000 \
-    PATH=/nodejs/bin:$PATH
+    PORT=3000
 
 # App will live here
 WORKDIR /app/backend
 
 # ---- Copy backend runtime (code + prod node_modules) ----
-COPY --from=backend-build --chown=nonroot:nonroot /app/backend /app/backend
+COPY --from=backend-build /app/backend /app/backend
 
 # ---- Copy Angular build output (STATIC files only) ----
-COPY --from=frontend-build --chown=nonroot:nonroot /app/frontend/dist/frontend/browser /app/backend/public/browser
+RUN mkdir -p /app/backend/public/browser
+COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
 
-# Distroless runs as nonroot (UID 65532) by default
-# No need for explicit USER directive
+# Clean up build artifacts
+RUN rm -rf /app/frontend /app/node_module /root/.npm /usr/local/lib/node_modules
+
+# ---- OpenShift arbitrary UID compatibility ----
+# - Give group 0 (root group) ownership
+# - Make group writable so random UID in group 0 can write
+RUN chgrp -R 0 /app && chmod -R g+rwX /app
+
+# Create non-root user but allow group 0 access for OpenShift
+RUN addgroup -g 1001 appuser && \
+    adduser -D -u 1001 -G appuser appuser && \
+    adduser appuser root
+
+USER 1001
 
 EXPOSE 3000
 
-# Distroless doesn't have shell or curl for healthcheck
-# Health checks should be configured in Kubernetes deployment
+# ---------------------------
+# HEALTHCHECK
+# ---------------------------
+# Make sure your backend has:
+#   app.get('/healthz', (req, res) => res.send('ok'));
+#
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:3000/healthz || exit 1
 
 # Start server
 CMD ["node", "index.js"]
-
