@@ -5,7 +5,7 @@ FROM node:25.8.1-alpine3.23 AS backend-build
 
 # If you ever need native builds (bcrypt, etc.) uncomment below:
 # RUN apk add --no-cache python3 make g++
-
+RUN apk update && apk upgrade --no-cache
 WORKDIR /app/backend
 
 # Install ONLY prod dependencies for backend
@@ -21,6 +21,7 @@ COPY backend/ ./
 # Stage 2: Frontend (Angular) build only
 # ===========================================
 FROM node:25.8.1-alpine3.23 AS frontend-build
+RUN apk update && apk upgrade --no-cache
 
 WORKDIR /app/frontend
 
@@ -37,7 +38,8 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Distroless - Production)
 # ===========================================
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs24-debian13:nonroot
+#FROM gcr.io/distroless/nodejs24-debian12:nonroot
 
 # Set environment variables
 ENV NODE_ENV=production \
@@ -62,5 +64,5 @@ EXPOSE 3000
 # Health checks should be configured in Kubernetes deployment
 
 # Start server
-CMD ["node", "index.js"]
+CMD ["index.js"]
 
