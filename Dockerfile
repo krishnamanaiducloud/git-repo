@@ -5,7 +5,8 @@ FROM node:25.8.1-alpine3.23 AS backend-build
 
 # If you ever need native builds (bcrypt, etc.) uncomment below:
 # RUN apk add --no-cache python3 make g++
-RUN apk update && apk upgrade --no-cache
+RUN apk update && apk upgrade --no-cache \
+    && npm install -g npm@latest
 WORKDIR /app/backend
 
 # Install ONLY prod dependencies for backend
@@ -21,7 +22,8 @@ COPY backend/ ./
 # Stage 2: Frontend (Angular) build only
 # ===========================================
 FROM node:25.8.1-alpine3.23 AS frontend-build
-RUN apk update && apk upgrade --no-cache
+RUN apk update && apk upgrade --no-cache \
+    && npm install -g npm@latest
 
 WORKDIR /app/frontend
 
@@ -36,33 +38,51 @@ COPY frontend/ ./
 RUN npm run build -- --configuration production
 
 # ===========================================
-# Stage 3: Runtime image (Distroless - Production)
+# Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM gcr.io/distroless/nodejs24-debian12:nonroot
-#FROM gcr.io/distroless/nodejs24-debian13:nonroot
+FROM node:25.8.1-alpine3.23
+
+RUN apk update && apk upgrade --no-cache \
+    && apk add --no-cache \
+        git \
+        openssh \
+        curl \
+        ca-certificates \
+    && rm -rf /usr/local/lib/node_modules/npm \
+             /usr/local/bin/npm \
+             /usr/local/bin/npx \
+             /usr/local/bin/corepack \
+    && rm -rf /var/cache/apk/*
 
 # Set environment variables
 ENV NODE_ENV=production \
-    PORT=3000 \
-    PATH=/nodejs/bin:$PATH
+    PORT=3000
 
 # App will live here
 WORKDIR /app/backend
 
 # ---- Copy backend runtime (code + prod node_modules) ----
-COPY --from=backend-build --chown=nonroot:nonroot /app/backend /app/backend
+COPY --from=backend-build /app/backend /app/backend
 
 # ---- Copy Angular build output (STATIC files only) ----
-COPY --from=frontend-build --chown=nonroot:nonroot /app/frontend/dist/frontend/browser /app/backend/public/browser
+RUN mkdir -p /app/backend/public/browser
+COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
 
-# Distroless runs as nonroot (UID 65532) by default
-# No need for explicit USER directive
+# ---- OpenShift arbitrary UID compatibility ----
+RUN chgrp -R 0 /app && chmod -R g+rwX /app
+
+# Create non-root user
+RUN addgroup -g 1001 appuser && \
+    adduser -D -u 1001 -G appuser appuser && \
+    adduser appuser root
+
+USER 1001
 
 EXPOSE 3000
 
-# Distroless doesn't have shell or curl for healthcheck
-# Health checks should be configured in Kubernetes deployment
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD curl -f http://localhost:3000/healthz || exit 1
 
 # Start server
-CMD ["index.js"]
+CMD ["node", "index.js"]
 

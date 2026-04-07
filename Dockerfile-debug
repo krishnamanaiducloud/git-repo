@@ -5,7 +5,8 @@ FROM node:25.8.1-alpine3.23 AS backend-build
 
 # If you ever need native builds (bcrypt, etc.) uncomment below:
 # RUN apk add --no-cache python3 make g++
-RUN apk update && apk upgrade --no-cache
+RUN apk update && apk upgrade --no-cache \
+    && npm install -g npm@latest
 WORKDIR /app/backend
 
 # Install ONLY prod dependencies for backend
@@ -21,7 +22,8 @@ COPY backend/ ./
 # Stage 2: Frontend (Angular) build only
 # ===========================================
 FROM node:25.8.1-alpine3.23 AS frontend-build
-RUN apk update && apk upgrade --no-cache
+RUN apk update && apk upgrade --no-cache \
+    && npm install -g npm@latest
 
 WORKDIR /app/frontend
 
@@ -51,6 +53,10 @@ RUN apk update && apk upgrade --no-cache \
         bash \
         vim \
         htop \
+    && rm -rf /usr/local/lib/node_modules/npm \
+             /usr/local/bin/npm \
+             /usr/local/bin/npx \
+             /usr/local/bin/corepack \
     && rm -rf /var/cache/apk/*
 
 # Set environment variables
