@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -11,7 +11,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     CommonModule,
     FormsModule,
     ReactiveFormsModule,
-    HttpClientModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './app.component.html',
@@ -22,6 +21,7 @@ export class AppComponent implements OnInit {
   form: FormGroup;
   createdProjectUrl: string | null = null;
   progress: number = 0;
+  private progressInterval: ReturnType<typeof setInterval> | null = null;
 
   subgroups: Array<{ label: string; value: string }> = [];
 
@@ -47,6 +47,10 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {
     this.loadSubgroups();
+    this.form.get('technology')?.valueChanges.subscribe(selectedTech => {
+      this.artifactTypes = this.artifactTypesByTechnology[selectedTech] || [];
+      this.form.controls['artifactType'].setValue('');
+    });
   }
 
   /**
@@ -59,20 +63,32 @@ export class AppComponent implements OnInit {
    * Regardless of hostname or domain.
    */
   loadSubgroups() {
-    this.http.get<any[]>('api/config/subgroups').subscribe(
-      data => {
+    this.http.get<any[]>('api/config/subgroups').subscribe({
+      next: (data) => {
         this.subgroups = data;
       },
-      error => {
+      error: (error) => {
         console.error('Failed to load subgroups', error);
-        alert('Error loading subgroups');
       }
-    );
+    });
   }
 
-  onTechnologyChange(selectedTech: string) {
-    this.artifactTypes = this.artifactTypesByTechnology[selectedTech] || [];
-    this.form.controls['artifactType'].setValue('');
+  private startProgressSimulation(): void {
+    this.clearProgressInterval();
+    this.progressInterval = setInterval(() => {
+      if (this.progress < 95) {
+        this.progress += 5;
+      } else {
+        this.clearProgressInterval();
+      }
+    }, 800);
+  }
+
+  private clearProgressInterval(): void {
+    if (this.progressInterval !== null) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
   }
 
   /**
@@ -86,34 +102,29 @@ export class AppComponent implements OnInit {
   submitForm() {
     if (this.form.valid) {
       this.progress = 10;
+      this.startProgressSimulation();
 
-      this.http.post('api/create_repo', this.form.value).subscribe(
-        (response: any) => {
+      this.http.post('api/create_repo', this.form.value).subscribe({
+        next: (response: any) => {
+          this.clearProgressInterval();
           this.progress = 100;
           console.log('Project created:', response.project_url);
           this.createdProjectUrl = response.project_url;
         },
-        (error) => {
+        error: (error) => {
+          this.clearProgressInterval();
           this.progress = 0;
           console.error('Error creating project:', error);
           alert('Error: ' + (error.error?.error || 'Unknown error'));
         }
-      );
-
-      const interval = setInterval(() => {
-        if (this.progress < 95) {
-          this.progress += 5;
-        } else {
-          clearInterval(interval);
-        }
-      }, 800);
-
+      });
     } else {
       alert('Please fill all required fields.');
     }
   }
 
   resetForm() {
+    this.clearProgressInterval();
     this.form.reset();
     this.createdProjectUrl = null;
     this.artifactTypes = [];

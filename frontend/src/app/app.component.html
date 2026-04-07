@@ -49,7 +49,7 @@
 
       <div class="form-group mt-3">
         <label>Technology *</label>
-        <select formControlName="technology" class="form-control" required (change)="onTechnologyChange(form.controls['technology'].value)">
+        <select formControlName="technology" class="form-control" required>
           <option value="">Select a technology</option>
           <option *ngFor="let tech of technologies" [value]="tech">{{ tech }}</option>
         </select>
