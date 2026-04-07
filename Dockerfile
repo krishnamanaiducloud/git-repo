@@ -38,8 +38,8 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Distroless - Production)
 # ===========================================
-FROM gcr.io/distroless/nodejs24-debian13:nonroot
-#FROM gcr.io/distroless/nodejs24-debian12:nonroot
+FROM gcr.io/distroless/nodejs24-debian12:nonroot
+#FROM gcr.io/distroless/nodejs24-debian13:nonroot
 
 # Set environment variables
 ENV NODE_ENV=production \

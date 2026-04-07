@@ -22,7 +22,7 @@ This application provides an intuitive web interface to automate GitLab reposito
 
 ### Runtime
 - **Node.js Build**: `25.8.1` (Alpine 3.23)
-- **Production Runtime**: `gcr.io/distroless/nodejs22-debian12:nonroot` (Distroless - no shell, no package manager)
+- **Production Runtime**: `gcr.io/distroless/nodejs24-debian12:nonroot` (Distroless - no shell, no package manager)
 - **Debug Runtime**: `alpine:3.23.3` (with shell and debugging tools)
 
 ### Frontend (Angular 19)
