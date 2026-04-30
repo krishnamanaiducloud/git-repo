@@ -1,0 +1,68 @@
+# ===========================================
+# .dockerignore — exclude paths from the build
+# context that Docker sends to the daemon.
+# Critical: keep host node_modules/ out so the
+# in-container `npm ci` is the source of truth.
+# ===========================================
+
+# Dependencies (must be installed inside the image, not copied from host)
+**/node_modules
+
+# Build outputs (regenerated inside the image)
+**/dist
+**/build
+**/.angular
+**/.cache
+frontend/coverage
+backend/coverage
+
+# Local environment / secrets — never ship into an image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editor / OS junk
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# VCS (don't bloat image with .git history)
+.git
+.gitignore
+.gitattributes
+
+# CI / Docker meta (no need inside the image)
+.github
+.gitlab
+Dockerfile
+Dockerfile-debug
+.dockerignore
+docker-compose*.yml
+
+# Kubernetes / Helm manifests (live alongside the repo, not in the image)
+k8s
+
+# Logs and tmp
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.npm
+**/.yarn
+tmp
+temp
+
+# Tests / docs
+**/*.test.js
+**/*.spec.js
+**/__tests__
+**/__snapshots__
+**/coverage
+*.md
+!README.md
+
+# Trivy / scanner config (not needed at runtime)
+.trivyignore
