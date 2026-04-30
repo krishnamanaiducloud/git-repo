@@ -1,75 +1,210 @@
-<div class="container mt-5">
-  <h1 class="text-center mb-4">GitLab Repo Creator</h1>
 
-  <!-- Show success message if project was created -->
-  <div *ngIf="createdProjectUrl; else formTemplate">
-    <div class="alert alert-success">
-      <h4 class="alert-heading">Repository Created Successfully!</h4>
-      <p>You can access it here:</p>
-      <p>
-        <a [href]="createdProjectUrl" target="_blank">{{ createdProjectUrl }}</a>
-      </p>
-      <button class="btn btn-primary mt-3" (click)="resetForm()">Create Another Repository</button>
-    </div>
+<div class="page">
+  <!-- Animated decorative background -->
+  <div class="page__bg" aria-hidden="true">
+    <span class="orb orb--1"></span>
+    <span class="orb orb--2"></span>
+    <span class="orb orb--3"></span>
+    <span class="grid"></span>
   </div>
 
-  <!-- Form template -->
-  <ng-template #formTemplate>
-    <h3 class="mb-3">Create New Repository</h3>
-    <p class="mb-4 text-muted">Fill in the details below to create a new GitLab repository using predefined templates.</p>
-
-    <!-- Modern Progress Loader with Angular Material -->
-    <div *ngIf="progress > 0 && progress < 100" class="d-flex flex-column align-items-center my-4">
-      <mat-progress-spinner
-        mode="determinate"
-        [value]="progress"
-        diameter="80"
-        strokeWidth="8"
-        color="primary">
-      </mat-progress-spinner>
-
-      <div class="h4 mt-3">{{ progress }}% Completed</div>
+  <!-- Top brand bar -->
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M22.65 14.39 12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94"/>
+        </svg>
+      </span>
+      <div class="topbar__title">
+        <strong>RepoForge</strong>
+        <span>GitLab Self-Service Portal</span>
+      </div>
     </div>
+    <span class="topbar__badge">v1.0</span>
+  </header>
 
-    <!-- Form -->
-    <form (ngSubmit)="submitForm()" [formGroup]="form">
-      <div class="form-group">
-        <label>Project Name *</label>
-        <input type="text" formControlName="projectName" class="form-control" placeholder="e.g. my-awesome-project" required />
-        <small class="form-text text-muted">Only letters, numbers, hyphens, and underscores allowed</small>
+  <main class="shell">
+
+    <!-- ===== Success state ===== -->
+    <section *ngIf="createdProjectUrl; else formTemplate" class="card card--success">
+      <div class="success-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
       </div>
+      <h2 class="card__title">Repository Created!</h2>
+      <p class="card__subtitle">Your new GitLab project is provisioned and ready to clone.</p>
 
-      <div class="form-group mt-3">
-        <label>Application Sub-group *</label>
-        <select formControlName="subgroup" class="form-control" required>
-          <option value="">Select an application sub-group</option>
-          <option *ngFor="let group of subgroups" [value]="group.value">{{ group.label }}</option>
-        </select>
+      <a [href]="createdProjectUrl" target="_blank" rel="noopener noreferrer" class="link-pill">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        {{ createdProjectUrl }}
+      </a>
+
+      <div class="actions">
+        <button class="btn btn--primary" (click)="resetForm()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Create Another
+        </button>
       </div>
+    </section>
 
-      <div class="form-group mt-3">
-        <label>Technology *</label>
-        <select formControlName="technology" class="form-control" required>
-          <option value="">Select a technology</option>
-          <option *ngFor="let tech of technologies" [value]="tech">{{ tech }}</option>
-        </select>
-      </div>
+    <!-- ===== Form state ===== -->
+    <ng-template #formTemplate>
+      <section class="card">
+        <div class="card__head">
+          <span class="eyebrow">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+            New Repository
+          </span>
+          <h1 class="card__title">Create a new repository</h1>
+          <p class="card__subtitle">Pick a stack, name your project, and we'll bootstrap it from a curated template — wired to GitLab in seconds.</p>
+        </div>
 
-      <div class="form-group mt-3">
-        <label>Artifact Type *</label>
-        <select formControlName="artifactType" class="form-control" required>
-          <option value="">Select an artifact type</option>
-          <option *ngFor="let type of artifactTypes" [value]="type">{{ type }}</option>
-        </select>
-      </div>
+        <!-- Loading state -->
+        <div *ngIf="progress > 0 && progress < 100" class="loading" role="status" aria-live="polite">
+          <mat-progress-spinner
+            mode="determinate"
+            [value]="progress"
+            diameter="56"
+            strokeWidth="5"
+            color="primary">
+          </mat-progress-spinner>
+          <div class="loading__label">
+            <strong>{{ progress }}%</strong>
+            <span>Provisioning your repository…</span>
+          </div>
+        </div>
 
-      <div class="form-group mt-3">
-        <label>Owner Info (optional)</label>
-        <input type="text" formControlName="ownerInfo" class="form-control" placeholder="john.doe@centene.com or John Doe" />
-      </div>
+        <!-- Form -->
+        <form (ngSubmit)="submitForm()" [formGroup]="form" class="form" novalidate>
 
-      <button type="submit" class="btn btn-primary mt-4" [disabled]="progress > 0 && progress < 100">Create Repository</button>
-    </form>
-  </ng-template>
+          <!-- Project Name -->
+          <label class="field">
+            <span class="field__label">
+              <span class="field__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+              </span>
+              Project Name
+              <span class="field__req">*</span>
+            </span>
+            <input type="text"
+                   formControlName="projectName"
+                   class="field__input"
+                   placeholder="my-awesome-project"
+                   autocomplete="off"
+                   spellcheck="false"
+                   required />
+            <small class="field__help">Letters, numbers, hyphens, and underscores only.</small>
+          </label>
+
+          <!-- Application Sub-group -->
+          <label class="field">
+            <span class="field__label">
+              <span class="field__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </span>
+              Application Sub-group
+              <span class="field__req">*</span>
+            </span>
+            <select formControlName="subgroup" class="field__input field__input--select" required>
+              <option value="">Select an application sub-group</option>
+              <option *ngFor="let group of subgroups" [value]="group.value">{{ group.label }}</option>
+            </select>
+          </label>
+
+          <!-- Technology -->
+          <label class="field">
+            <span class="field__label">
+              <span class="field__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </span>
+              Technology
+              <span class="field__req">*</span>
+            </span>
+            <select formControlName="technology" class="field__input field__input--select" required>
+              <option value="">Select a technology</option>
+              <option *ngFor="let tech of technologies" [value]="tech">{{ tech }}</option>
+            </select>
+          </label>
+
+          <!-- Artifact Type -->
+          <label class="field">
+            <span class="field__label">
+              <span class="field__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                  <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+              </span>
+              Artifact Type
+              <span class="field__req">*</span>
+            </span>
+            <select formControlName="artifactType" class="field__input field__input--select" required>
+              <option value="">Select an artifact type</option>
+              <option *ngFor="let type of artifactTypes" [value]="type">{{ type }}</option>
+            </select>
+          </label>
+
+          <!-- Owner Info -->
+          <label class="field">
+            <span class="field__label">
+              <span class="field__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+              </span>
+              Owner Info
+              <span class="field__opt">optional</span>
+            </span>
+            <input type="text"
+                   formControlName="ownerInfo"
+                   class="field__input"
+                   placeholder="john.doe@centene.com or John Doe"
+                   autocomplete="off" />
+          </label>
+
+          <!-- Submit -->
+          <button type="submit"
+                  class="btn btn--primary btn--lg btn--block"
+                  [disabled]="progress > 0 && progress < 100">
+            <ng-container *ngIf="!(progress > 0 && progress < 100); else submitting">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+              </svg>
+              Create Repository
+            </ng-container>
+            <ng-template #submitting>
+              <span class="spinner-sm"></span>
+              Creating…
+            </ng-template>
+          </button>
+        </form>
+      </section>
+    </ng-template>
+
+    <footer class="foot">
+      <span>Centene Platform Engineering</span>
+      <span aria-hidden="true">·</span>
+      <span class="mono">GitLab API v4</span>
+    </footer>
+  </main>
 </div>
-

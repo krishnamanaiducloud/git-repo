@@ -1,4 +1,106 @@
-.container {
-  max-width: 600px;
+/* ============================================================
+   App-component layout glue
+   (Theme tokens & component classes live in src/styles.scss)
+   ============================================================ */
+
+:host { display: block; min-height: 100vh; }
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+/* Animated decorative background */
+.page__bg {
+  position: fixed; inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(at 20% 0%,  rgba(99,102,241,0.18) 0px, transparent 50%),
+    radial-gradient(at 80% 0%,  rgba(168,85,247,0.14) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(16,185,129,0.10) 0px, transparent 50%),
+    var(--bg);
+}
+
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(60px); opacity: 0.45;
+  pointer-events: none;
+}
+.orb--1 {
+  width: 380px; height: 380px;
+  top: -120px; left: -100px;
+  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+  animation: float1 18s ease-in-out infinite;
+}
+.orb--2 {
+  width: 460px; height: 460px;
+  top: 10%; right: -160px;
+  background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+  animation: float2 22s ease-in-out infinite;
+}
+.orb--3 {
+  width: 320px; height: 320px;
+  bottom: -100px; left: 30%;
+  background: radial-gradient(circle, #10b981 0%, transparent 70%);
+  opacity: 0.3;
+  animation: float3 26s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(40px, 30px) scale(1.05); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(-30px, 40px) scale(1.08); }
+}
+@keyframes float3 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(20px, -30px) scale(1.06); }
+}
+
+/* Subtle grid pattern over background */
+.grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+}
+
+/* Centered content shell */
+.shell {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 56px 20px 40px;
+  animation: rise 0.5s var(--ease) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Eyebrow tag above card title */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  padding: 5px 10px; border-radius: 999px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(99,102,241,0.18);
+}
+.eyebrow svg { color: var(--accent); }
+
+/* Mobile */
+@media (max-width: 640px) {
+  .shell { padding: 28px 14px 32px; }
+  .orb { filter: blur(50px); }
 }
 
