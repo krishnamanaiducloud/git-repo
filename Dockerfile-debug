@@ -43,15 +43,15 @@ RUN npm run build -- --configuration production
 FROM alpine:3.23.4
 
 # Install Node.js runtime + debugging tools
+# NOTE: openssh and curl are intentionally NOT installed (see Dockerfile).
+# The app uses HTTPS+OAuth for git, and the HEALTHCHECK uses node's http module.
+# vim is also dropped (CVE-2026-39881/41411/42307); use `htop`/`busybox vi` for debug.
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
         nodejs \
         git \
-        openssh \
-        curl \
         ca-certificates \
         bash \
-        vim \
         htop \
     # ── Explicitly upgrade packages with known CVE fixes ──
     && apk add --no-cache --upgrade \
@@ -100,7 +100,7 @@ EXPOSE 3000
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD curl -f http://localhost:3000/healthz || exit 1
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 # Start server
 CMD ["node", "index.js"]

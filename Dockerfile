@@ -42,11 +42,15 @@ RUN npm run build -- --configuration production
 # ===========================================
 FROM node:25.9.0-alpine3.23
 
+# NOTE: openssh and curl are intentionally NOT installed.
+#   - The app uses HTTPS + OAuth tokens for git (no SSH needed).
+#   - HEALTHCHECK uses node's built-in http module (no curl needed).
+# This eliminates the openssh CVE-2026-35414 family and the
+# curl/libcurl CVE families (CVE-2025-13034/14017/14524/14819/15079/15224,
+# CVE-2026-1965/3783/3784/3805) which have no fix in Alpine 3.23.
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
         git \
-        openssh \
-        curl \
         ca-certificates \
     # ── Explicitly upgrade packages with known CVE fixes ──
     && apk add --no-cache --upgrade \
@@ -95,7 +99,7 @@ EXPOSE 3000
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD curl -f http://localhost:3000/healthz || exit 1
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 # Start server
 CMD ["node", "index.js"]
