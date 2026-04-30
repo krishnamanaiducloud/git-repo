@@ -1,7 +1,7 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-FROM node:25.8.1-alpine3.23 AS backend-build
+FROM node:25.9.0-alpine3.23 AS backend-build
 
 # If you ever need native builds (bcrypt, etc.) uncomment below:
 # RUN apk add --no-cache python3 make g++
@@ -21,7 +21,7 @@ COPY backend/ ./
 # ===========================================
 # Stage 2: Frontend (Angular) build only
 # ===========================================
-FROM node:25.8.1-alpine3.23 AS frontend-build
+FROM node:25.9.0-alpine3.23 AS frontend-build
 RUN apk update && apk upgrade --no-cache \
     && npm install -g npm@latest
 
@@ -40,7 +40,7 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM node:25.8.1-alpine3.23
+FROM node:25.9.0-alpine3.23
 
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
@@ -48,6 +48,15 @@ RUN apk update && apk upgrade --no-cache \
         openssh \
         curl \
         ca-certificates \
+    # ── Explicitly upgrade packages with known CVE fixes ──
+    && apk add --no-cache --upgrade \
+        libssl3 \
+        libcrypto3 \
+        musl \
+        musl-utils \
+        nghttp2-libs \
+    # ── Remove vim (not needed in production; fixes CVE-2026-39881, CVE-2026-41411, CVE-2026-42307) ──
+    && apk del --no-cache vim vim-common xxd 2>/dev/null || true \
     && rm -rf /usr/local/lib/node_modules/npm \
              /usr/local/bin/npm \
              /usr/local/bin/npx \
@@ -68,6 +77,9 @@ COPY --from=backend-build /app/backend /app/backend
 RUN mkdir -p /app/backend/public/browser
 COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
 
+# Clean up build artifacts
+RUN rm -rf /app/frontend /root/.npm /usr/local/lib/node_modules
+
 # ---- OpenShift arbitrary UID compatibility ----
 RUN chgrp -R 0 /app && chmod -R g+rwX /app
 
@@ -79,6 +91,8 @@ RUN addgroup -g 1001 appuser && \
 USER 1001
 
 EXPOSE 3000
+
+STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD curl -f http://localhost:3000/healthz || exit 1

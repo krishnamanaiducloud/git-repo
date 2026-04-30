@@ -12,11 +12,31 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // -------------------------
-// Express middleware
+// Dynamic base path for OpenShift Route / Istio VirtualService
+// Set BASE_PATH=/git-repo when serving under a sub-path.
 // -------------------------
-app.use(bodyParser.json());
+const BASE_PATH = (process.env.BASE_PATH || '/').replace(/\/+$/, '') || '/';
+let isReady = false;
 
-app.use(
+// -------------------------
+// Health probes — root level, always reachable by k8s/OpenShift
+// -------------------------
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
+});
+
+app.get('/readyz', (req, res) => {
+  res.status(isReady ? 200 : 503).send(isReady ? 'ok' : 'not ready');
+});
+
+// -------------------------
+// Application router (mounted at BASE_PATH for path-based routing)
+// -------------------------
+const router = express.Router();
+
+router.use(bodyParser.json({ limit: '1mb' }));
+
+router.use(
   express.static(path.join(__dirname, 'public/browser'), {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.css')) {
@@ -323,7 +343,7 @@ async function retryGitPush(gitRepo, args, retries = 5, delayMs = 2000) {
 // -------------------------
 // API: config for subgroups
 // -------------------------
-app.get('/api/config/subgroups', (req, res) => {
+router.get('/api/config/subgroups', (req, res) => {
   try {
     const subgroups = Object.keys(namespaceMap).map((key) => ({
       label: key,
@@ -339,7 +359,7 @@ app.get('/api/config/subgroups', (req, res) => {
 // -------------------------
 // API: create GitLab repo
 // -------------------------
-app.post('/api/create_repo', async (req, res) => {
+router.post('/api/create_repo', async (req, res) => {
   const tmpDir = path.join(os.tmpdir(), `repo-${Date.now()}`);
   let project_id = null;
 
@@ -608,20 +628,44 @@ app.post('/api/create_repo', async (req, res) => {
 });
 
 // -------------------------
-// SPA fallback (Angular)
+// SPA fallback (Angular) — skip /api paths so they 404 cleanly
 // -------------------------
-app.get('*', (req, res) => {
+router.get('/{*splat}', (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
   res.sendFile(
     path.join(__dirname, 'public/browser', 'index.html')
   );
 });
 
 // -------------------------
-// Start server
+// Mount router at the configured base path
 // -------------------------
-app.listen(port, () => {
+app.use(BASE_PATH, router);
+
+// -------------------------
+// Start server + graceful shutdown
+// -------------------------
+const server = app.listen(port, () => {
+  isReady = true;
   console.log(
-    `GitLab Repo Creator backend running on port ${port}`
+    `GitLab Repo Creator running on port ${port} (BASE_PATH=${BASE_PATH})`
   );
 });
 
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  isReady = false;
+  server.close(() => {
+    console.log('HTTP server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
