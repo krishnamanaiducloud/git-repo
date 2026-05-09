@@ -1,14 +1,8 @@
-
 <div class="page">
-  <!-- Animated decorative background -->
   <div class="page__bg" aria-hidden="true">
-    <span class="orb orb--1"></span>
-    <span class="orb orb--2"></span>
-    <span class="orb orb--3"></span>
     <span class="grid"></span>
   </div>
 
-  <!-- Top brand bar -->
   <header class="topbar">
     <div class="topbar__brand">
       <span class="topbar__logo" aria-hidden="true">
@@ -21,19 +15,43 @@
         <span>GitLab Self-Service Portal</span>
       </div>
     </div>
-    <span class="topbar__badge">v1.0</span>
+    <div class="topbar__meta">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>Ready</span>
+    </div>
   </header>
 
   <main class="shell">
+    <aside class="overview" aria-label="Repository creation summary">
+      <div class="overview__panel">
+        <span class="overview__kicker">Platform workflow</span>
+        <h1>Provision a GitLab repository</h1>
+        <p>Choose the application group, stack, and artifact type. RepoForge will create the project from the mapped template.</p>
+      </div>
 
-    <!-- ===== Success state ===== -->
+      <div class="overview__steps" aria-label="Workflow steps">
+        <div class="step">
+          <span class="step__index">1</span>
+          <span>Project details</span>
+        </div>
+        <div class="step">
+          <span class="step__index">2</span>
+          <span>Template selection</span>
+        </div>
+        <div class="step">
+          <span class="step__index">3</span>
+          <span>GitLab creation</span>
+        </div>
+      </div>
+    </aside>
+
     <section *ngIf="createdProjectUrl; else formTemplate" class="card card--success">
       <div class="success-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       </div>
-      <h2 class="card__title">Repository Created!</h2>
+      <h2 class="card__title">Repository created</h2>
       <p class="card__subtitle">Your new GitLab project is provisioned and ready to clone.</p>
 
       <a [href]="createdProjectUrl" target="_blank" rel="noopener noreferrer" class="link-pill">
@@ -55,7 +73,6 @@
       </div>
     </section>
 
-    <!-- ===== Form state ===== -->
     <ng-template #formTemplate>
       <section class="card">
         <div class="card__head">
@@ -63,11 +80,10 @@
             <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
             New Repository
           </span>
-          <h1 class="card__title">Create a new repository</h1>
-          <p class="card__subtitle">Pick a stack, name your project, and we'll bootstrap it from a curated template — wired to GitLab in seconds.</p>
+          <h2 class="card__title">Repository details</h2>
+          <p class="card__subtitle">Required fields are marked with an asterisk. Owner info is added when your template supports it.</p>
         </div>
 
-        <!-- Loading state -->
         <div *ngIf="progress > 0 && progress < 100" class="loading" role="status" aria-live="polite">
           <mat-progress-spinner
             mode="determinate"
@@ -78,14 +94,11 @@
           </mat-progress-spinner>
           <div class="loading__label">
             <strong>{{ progress }}%</strong>
-            <span>Provisioning your repository…</span>
+            <span>Provisioning your repository...</span>
           </div>
         </div>
 
-        <!-- Form -->
         <form (ngSubmit)="submitForm()" [formGroup]="form" class="form" novalidate>
-
-          <!-- Project Name -->
           <label class="field">
             <span class="field__label">
               <span class="field__icon" aria-hidden="true">
@@ -106,7 +119,6 @@
             <small class="field__help">Letters, numbers, hyphens, and underscores only.</small>
           </label>
 
-          <!-- Application Sub-group -->
           <label class="field">
             <span class="field__label">
               <span class="field__icon" aria-hidden="true">
@@ -126,7 +138,6 @@
             </select>
           </label>
 
-          <!-- Technology -->
           <label class="field">
             <span class="field__label">
               <span class="field__icon" aria-hidden="true">
@@ -144,7 +155,6 @@
             </select>
           </label>
 
-          <!-- Artifact Type -->
           <label class="field">
             <span class="field__label">
               <span class="field__icon" aria-hidden="true">
@@ -163,7 +173,6 @@
             </select>
           </label>
 
-          <!-- Owner Info -->
           <label class="field">
             <span class="field__label">
               <span class="field__icon" aria-hidden="true">
@@ -182,7 +191,6 @@
                    autocomplete="off" />
           </label>
 
-          <!-- Submit -->
           <button type="submit"
                   class="btn btn--primary btn--lg btn--block"
                   [disabled]="progress > 0 && progress < 100">
@@ -194,7 +202,7 @@
             </ng-container>
             <ng-template #submitting>
               <span class="spinner-sm"></span>
-              Creating…
+              Creating...
             </ng-template>
           </button>
         </form>
@@ -203,7 +211,7 @@
 
     <footer class="foot">
       <span>Centene Platform Engineering</span>
-      <span aria-hidden="true">·</span>
+      <span aria-hidden="true">/</span>
       <span class="mono">GitLab API v4</span>
     </footer>
   </main>
