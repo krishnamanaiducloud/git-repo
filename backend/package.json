@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.15.2",
+    "axios": "^1.16.0",
     "body-parser": "^2.2.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -18,7 +18,9 @@
     "tar": "^7.5.13"
   },
   "overrides": {
-    "follow-redirects": ">=1.16.0"
+    "follow-redirects": ">=1.16.0",
+    "brace-expansion": ">=5.0.6",
+    "qs": ">=6.15.2"
   }
 }
 

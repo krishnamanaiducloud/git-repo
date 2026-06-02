@@ -1,65 +1,52 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-FROM node:25.9.0-alpine3.23 AS backend-build
+FROM node:26.3.0-alpine3.23 AS backend-build
 
-# If you ever need native builds (bcrypt, etc.) uncomment below:
-# RUN apk add --no-cache python3 make g++
 RUN apk update && apk upgrade --no-cache \
     && npm install -g npm@latest
 WORKDIR /app/backend
 
-# Install ONLY prod dependencies for backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
-# Copy backend source code
 COPY backend/ ./
-# If you have a build step (e.g. TypeScript), uncomment:
-# RUN npm run build
 
 # ===========================================
 # Stage 2: Frontend (Angular) build only
 # ===========================================
-FROM node:25.9.0-alpine3.23 AS frontend-build
+FROM node:26.3.0-alpine3.23 AS frontend-build
 RUN apk update && apk upgrade --no-cache \
     && npm install -g npm@latest
 
 WORKDIR /app/frontend
 
-# Use lockfile so builds are repeatable and secure
 COPY frontend/package*.json ./
-RUN npm ci --ignore-scripts               # dev deps are OK here (build stage only)
+RUN npm ci --ignore-scripts
 
-# Copy the rest of the frontend
 COPY frontend/ ./
 
-# Build Angular app (browser build)
 RUN npm run build -- --configuration production
 
 # ===========================================
 # Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM node:25.9.0-alpine3.23
+FROM node:26.3.0-alpine3.23
 
-# NOTE: openssh and curl are intentionally NOT installed.
-#   - The app uses HTTPS + OAuth tokens for git (no SSH needed).
-#   - HEALTHCHECK uses node's built-in http module (no curl needed).
-# This eliminates the openssh CVE-2026-35414 family and the
-# curl/libcurl CVE families (CVE-2025-13034/14017/14524/14819/15079/15224,
-# CVE-2026-1965/3783/3784/3805) which have no fix in Alpine 3.23.
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
         git \
         ca-certificates \
-    # ── Explicitly upgrade packages with known CVE fixes ──
     && apk add --no-cache --upgrade \
         libssl3 \
         libcrypto3 \
         musl \
         musl-utils \
         nghttp2-libs \
-    # ── Remove vim (not needed in production; fixes CVE-2026-39881, CVE-2026-41411, CVE-2026-42307) ──
+        libcurl \
+        busybox \
+        busybox-binsh \
+        ssl_client \
     && apk del --no-cache vim vim-common xxd 2>/dev/null || true \
     && rm -rf /usr/local/lib/node_modules/npm \
              /usr/local/bin/npm \
@@ -67,27 +54,20 @@ RUN apk update && apk upgrade --no-cache \
              /usr/local/bin/corepack \
     && rm -rf /var/cache/apk/*
 
-# Set environment variables
 ENV NODE_ENV=production \
     PORT=3000
 
-# App will live here
 WORKDIR /app/backend
 
-# ---- Copy backend runtime (code + prod node_modules) ----
 COPY --from=backend-build /app/backend /app/backend
 
-# ---- Copy Angular build output (STATIC files only) ----
 RUN mkdir -p /app/backend/public/browser
 COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
 
-# Clean up build artifacts
 RUN rm -rf /app/frontend /root/.npm /usr/local/lib/node_modules
 
-# ---- OpenShift arbitrary UID compatibility ----
 RUN chgrp -R 0 /app && chmod -R g+rwX /app
 
-# Create non-root user
 RUN addgroup -g 1001 appuser && \
     adduser -D -u 1001 -G appuser appuser && \
     adduser appuser root
@@ -101,6 +81,5 @@ STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
-# Start server
 CMD ["node", "index.js"]
 
