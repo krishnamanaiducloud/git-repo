@@ -1,7 +1,7 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-FROM node:26.3.0-alpine3.23 AS backend-build
+FROM node:26.3.0-alpine3.24 AS backend-build
 
 RUN apk update && apk upgrade --no-cache \
     && npm install -g npm@latest
@@ -15,7 +15,7 @@ COPY backend/ ./
 # ===========================================
 # Stage 2: Frontend (Angular) build only
 # ===========================================
-FROM node:26.3.0-alpine3.23 AS frontend-build
+FROM node:26.3.0-alpine3.24 AS frontend-build
 RUN apk update && apk upgrade --no-cache \
     && npm install -g npm@latest
 
@@ -31,7 +31,7 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM node:26.3.0-alpine3.23
+FROM node:26.3.0-alpine3.24
 
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
