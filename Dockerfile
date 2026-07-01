@@ -1,10 +1,14 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-FROM node:26.3.0-alpine3.24 AS backend-build
+ARG NODE_IMAGE=node:24.18.0-alpine3.24
+ARG NPM_VERSION=11.18.0
 
-RUN apk update && apk upgrade --no-cache \
-    && npm install -g npm@latest
+FROM ${NODE_IMAGE} AS backend-build
+ARG NPM_VERSION
+
+RUN apk upgrade --no-cache \
+    && npm install -g npm@${NPM_VERSION}
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
@@ -15,9 +19,11 @@ COPY backend/ ./
 # ===========================================
 # Stage 2: Frontend (Angular) build only
 # ===========================================
-FROM node:26.3.0-alpine3.24 AS frontend-build
-RUN apk update && apk upgrade --no-cache \
-    && npm install -g npm@latest
+FROM ${NODE_IMAGE} AS frontend-build
+ARG NPM_VERSION
+
+RUN apk upgrade --no-cache \
+    && npm install -g npm@${NPM_VERSION}
 
 WORKDIR /app/frontend
 
@@ -31,28 +37,18 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM node:26.3.0-alpine3.24
+FROM ${NODE_IMAGE}
 
-RUN apk update && apk upgrade --no-cache \
+RUN apk upgrade --no-cache \
     && apk add --no-cache \
         git \
         ca-certificates \
-    && apk add --no-cache --upgrade \
-        libssl3 \
-        libcrypto3 \
-        musl \
-        musl-utils \
-        nghttp2-libs \
-        libcurl \
-        busybox \
-        busybox-binsh \
-        ssl_client \
-    && apk del --no-cache vim vim-common xxd 2>/dev/null || true \
+    && update-ca-certificates \
+    && (apk del --no-cache vim vim-common xxd 2>/dev/null || true) \
     && rm -rf /usr/local/lib/node_modules/npm \
              /usr/local/bin/npm \
              /usr/local/bin/npx \
-             /usr/local/bin/corepack \
-    && rm -rf /var/cache/apk/*
+             /usr/local/bin/corepack
 
 ENV NODE_ENV=production \
     PORT=3000
