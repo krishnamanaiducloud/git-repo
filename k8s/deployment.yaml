@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
       - name: gitlab-repo-creator
-        image: your-docker-repo/gitlab-repo-creator:latest
+        image: your-docker-repo/gitlab-repo-creator:prod-07-15-2026
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
         envFrom:

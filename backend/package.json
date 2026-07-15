@@ -15,7 +15,7 @@
     "fs-extra": "^11.3.6",
     "glob": "^13.0.6",
     "simple-git": "^3.36.0",
-    "tar": "^7.5.19"
+    "tar": "^7.5.20"
   },
   "overrides": {
     "follow-redirects": ">=1.16.0",

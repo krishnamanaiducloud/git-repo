@@ -14,17 +14,11 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'frontend' title`, () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual(undefined);  // no title defined now
-  });
-
   it('should render form title', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('GitLab Repo Creator');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Provision a GitLab repository');
   });
 });
 

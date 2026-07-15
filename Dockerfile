@@ -2,7 +2,7 @@
 # Stage 1: Backend deps + build (if any)
 # ===========================================
 ARG NODE_IMAGE=node:24.18.0-alpine3.24
-ARG NPM_VERSION=11.18.0
+ARG NPM_VERSION=12.0.1
 
 FROM ${NODE_IMAGE} AS backend-build
 ARG NPM_VERSION
@@ -37,7 +37,7 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Runtime image (Alpine - Production)
 # ===========================================
-FROM ${NODE_IMAGE}
+FROM ${NODE_IMAGE} AS runtime
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
