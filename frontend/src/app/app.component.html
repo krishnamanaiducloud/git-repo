@@ -1,7 +1,7 @@
+<a class="skip-link" href="#main-content">Skip to repository form</a>
+
 <div class="page">
-  <div class="page__bg" aria-hidden="true">
-    <span class="grid"></span>
-  </div>
+  <div class="page__bg" aria-hidden="true"><span class="grid"></span></div>
 
   <header class="topbar">
     <div class="topbar__brand">
@@ -15,204 +15,127 @@
         <span>GitLab Self-Service Portal</span>
       </div>
     </div>
-    <div class="topbar__meta">
-      <span class="status-dot" aria-hidden="true"></span>
-      <span>Ready</span>
+    <div class="topbar__meta" role="status" aria-live="polite">
+      <span class="status-dot" [class.status-dot--busy]="isSubmitting() || isLoadingConfig()" aria-hidden="true"></span>
+      <span>{{ isSubmitting() ? 'Creating repository' : isLoadingConfig() ? 'Loading configuration' : 'Ready' }}</span>
     </div>
   </header>
 
-  <main class="shell">
+  <main class="shell" id="main-content">
     <aside class="overview" aria-label="Repository creation summary">
       <div class="overview__panel">
         <span class="overview__kicker">Platform workflow</span>
         <h1>Provision a GitLab repository</h1>
-        <p>Choose the application group, stack, and artifact type. RepoForge will create the project from the mapped template.</p>
+        <p>Choose the application group, stack, and artifact type. RepoForge creates a private project from the approved template.</p>
       </div>
 
-      <div class="overview__steps" aria-label="Workflow steps">
-        <div class="step">
-          <span class="step__index">1</span>
-          <span>Project details</span>
-        </div>
-        <div class="step">
-          <span class="step__index">2</span>
-          <span>Template selection</span>
-        </div>
-        <div class="step">
-          <span class="step__index">3</span>
-          <span>GitLab creation</span>
-        </div>
-      </div>
+      <ol class="overview__steps" aria-label="Workflow steps">
+        <li class="step"><span class="step__index">1</span><span>Project details</span></li>
+        <li class="step"><span class="step__index">2</span><span>Template selection</span></li>
+        <li class="step"><span class="step__index">3</span><span>GitLab creation</span></li>
+      </ol>
     </aside>
 
-    <section *ngIf="createdProjectUrl; else formTemplate" class="card card--success">
-      <div class="success-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-      </div>
-      <h2 class="card__title">Repository created</h2>
-      <p class="card__subtitle">Your new GitLab project is provisioned and ready to clone.</p>
-
-      <a [href]="createdProjectUrl" target="_blank" rel="noopener noreferrer" class="link-pill">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-          <polyline points="15 3 21 3 21 9"/>
-          <line x1="10" y1="14" x2="21" y2="3"/>
-        </svg>
-        {{ createdProjectUrl }}
-      </a>
-
-      <div class="actions">
-        <button class="btn btn--primary" (click)="resetForm()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Create Another
-        </button>
-      </div>
-    </section>
-
-    <ng-template #formTemplate>
-      <section class="card">
+    @if (createdProjectUrl(); as projectUrl) {
+      <section class="card card--success" aria-labelledby="success-title" role="status">
+        <div class="success-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 class="card__title" id="success-title">Repository created</h2>
+        <p class="card__subtitle">Your new GitLab project is provisioned and ready to clone.</p>
+        <a [href]="projectUrl" target="_blank" rel="noopener noreferrer" class="link-pill">
+          <span>{{ projectUrl }}</span><span class="visually-hidden"> (opens in a new tab)</span>
+        </a>
+        <div class="actions"><button type="button" class="btn btn--primary" (click)="resetForm()">Create another</button></div>
+      </section>
+    } @else {
+      <section class="card" [attr.aria-busy]="isSubmitting()">
         <div class="card__head">
-          <span class="eyebrow">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
-            New Repository
-          </span>
+          <span class="eyebrow">New repository</span>
           <h2 class="card__title">Repository details</h2>
-          <p class="card__subtitle">Required fields are marked with an asterisk. Owner info is added when your template supports it.</p>
+          <p class="card__subtitle">Required fields are marked with an asterisk. Your entries stay in place if creation fails.</p>
         </div>
 
-        <div *ngIf="progress > 0 && progress < 100" class="loading" role="status" aria-live="polite">
-          <mat-progress-spinner
-            mode="determinate"
-            [value]="progress"
-            diameter="56"
-            strokeWidth="5"
-            color="primary">
-          </mat-progress-spinner>
-          <div class="loading__label">
-            <strong>{{ progress }}%</strong>
-            <span>Provisioning your repository...</span>
+        @if (errorMessage(); as error) {
+          <div class="alert alert--error" role="alert">
+            <span>{{ error }}</span>
+            @if (subgroups().length === 0 && !isLoadingConfig()) {
+              <button type="button" class="alert__action" (click)="loadSubgroups()">Retry configuration</button>
+            }
           </div>
-        </div>
+        }
+
+        @if (isSubmitting()) {
+          <div class="loading" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <div class="loading__label">
+              <strong>Creating your repository</strong>
+              <span>This can take a few minutes while GitLab initializes the project and policies.</span>
+            </div>
+          </div>
+        }
 
         <form (ngSubmit)="submitForm()" [formGroup]="form" class="form" novalidate>
-          <label class="field">
-            <span class="field__label">
-              <span class="field__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-              </span>
-              Project Name
-              <span class="field__req">*</span>
-            </span>
-            <input type="text"
-                   formControlName="projectName"
-                   class="field__input"
-                   placeholder="my-awesome-project"
-                   autocomplete="off"
-                   spellcheck="false"
-                   required />
-            <small class="field__help">Letters, numbers, hyphens, and underscores only.</small>
-          </label>
+          <div class="field">
+            <label class="field__label" for="project-name">Project name <span class="field__req" aria-hidden="true">*</span></label>
+            <input id="project-name" type="text" formControlName="projectName" class="field__input"
+                   placeholder="my-awesome-project" autocomplete="off" spellcheck="false"
+                   aria-describedby="project-name-help project-name-error"
+                   [attr.aria-invalid]="fieldInvalid('projectName')" required>
+            <small class="field__help" id="project-name-help">2–63 characters: letters, numbers, hyphens, and underscores; start with a letter or number.</small>
+            @if (fieldInvalid('projectName')) {
+              <small class="field__error" id="project-name-error">Enter a valid project name.</small>
+            }
+          </div>
 
-          <label class="field">
-            <span class="field__label">
-              <span class="field__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-              </span>
-              Application Sub-group
-              <span class="field__req">*</span>
-            </span>
-            <select formControlName="subgroup" class="field__input field__input--select" required>
-              <option value="">Select an application sub-group</option>
-              <option *ngFor="let group of subgroups" [value]="group.value">{{ group.label }}</option>
+          <div class="field">
+            <label class="field__label" for="subgroup">Application subgroup <span class="field__req" aria-hidden="true">*</span></label>
+            <select id="subgroup" formControlName="subgroup" class="field__input field__input--select"
+                    [attr.aria-invalid]="fieldInvalid('subgroup')" aria-describedby="subgroup-error" required>
+              <option value="">{{ isLoadingConfig() ? 'Loading application subgroups…' : 'Select an application subgroup' }}</option>
+              @for (group of subgroups(); track group.value) {
+                <option [value]="group.value">{{ group.label }}</option>
+              }
             </select>
-          </label>
+            @if (fieldInvalid('subgroup')) { <small class="field__error" id="subgroup-error">Select an application subgroup.</small> }
+          </div>
 
-          <label class="field">
-            <span class="field__label">
-              <span class="field__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="16 18 22 12 16 6"/>
-                  <polyline points="8 6 2 12 8 18"/>
-                </svg>
-              </span>
-              Technology
-              <span class="field__req">*</span>
-            </span>
-            <select formControlName="technology" class="field__input field__input--select" required>
+          <div class="field">
+            <label class="field__label" for="technology">Technology <span class="field__req" aria-hidden="true">*</span></label>
+            <select id="technology" formControlName="technology" class="field__input field__input--select"
+                    [attr.aria-invalid]="fieldInvalid('technology')" aria-describedby="technology-error" required>
               <option value="">Select a technology</option>
-              <option *ngFor="let tech of technologies" [value]="tech">{{ tech }}</option>
+              @for (technology of technologies; track technology) { <option [value]="technology">{{ technology }}</option> }
             </select>
-          </label>
+            @if (fieldInvalid('technology')) { <small class="field__error" id="technology-error">Select a technology.</small> }
+          </div>
 
-          <label class="field">
-            <span class="field__label">
-              <span class="field__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                  <line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-              </span>
-              Artifact Type
-              <span class="field__req">*</span>
-            </span>
-            <select formControlName="artifactType" class="field__input field__input--select" required>
+          <div class="field">
+            <label class="field__label" for="artifact-type">Artifact type <span class="field__req" aria-hidden="true">*</span></label>
+            <select id="artifact-type" formControlName="artifactType" class="field__input field__input--select"
+                    [attr.aria-invalid]="fieldInvalid('artifactType')" aria-describedby="artifact-error" required>
               <option value="">Select an artifact type</option>
-              <option *ngFor="let type of artifactTypes" [value]="type">{{ type }}</option>
+              @for (type of artifactTypes(); track type) { <option [value]="type">{{ type }}</option> }
             </select>
-          </label>
+            @if (fieldInvalid('artifactType')) { <small class="field__error" id="artifact-error">Select an artifact type.</small> }
+          </div>
 
-          <label class="field">
-            <span class="field__label">
-              <span class="field__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-              </span>
-              Owner Info
-              <span class="field__opt">optional</span>
-            </span>
-            <input type="text"
-                   formControlName="ownerInfo"
-                   class="field__input"
-                   placeholder="john.doe@centene.com or John Doe"
-                   autocomplete="off" />
-          </label>
+          <div class="field">
+            <label class="field__label" for="owner-info">Owner info <span class="field__opt">optional</span></label>
+            <input id="owner-info" type="text" formControlName="ownerInfo" class="field__input"
+                   placeholder="team@example.com or Team Name" autocomplete="organization" maxlength="200"
+                   [attr.aria-invalid]="fieldInvalid('ownerInfo')" aria-describedby="owner-error">
+            @if (fieldInvalid('ownerInfo')) { <small class="field__error" id="owner-error">Owner info must be 200 characters or fewer.</small> }
+          </div>
 
-          <button type="submit"
-                  class="btn btn--primary btn--lg btn--block"
-                  [disabled]="progress > 0 && progress < 100">
-            <ng-container *ngIf="!(progress > 0 && progress < 100); else submitting">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-              </svg>
-              Create Repository
-            </ng-container>
-            <ng-template #submitting>
-              <span class="spinner-sm"></span>
-              Creating...
-            </ng-template>
+          <button type="submit" class="btn btn--primary btn--lg btn--block" [disabled]="isSubmitting() || isLoadingConfig() || subgroups().length === 0">
+            @if (isSubmitting()) { <span class="spinner-sm" aria-hidden="true"></span><span>Creating…</span> }
+            @else { <span>Create repository</span> }
           </button>
         </form>
       </section>
-    </ng-template>
+    }
 
-    <footer class="foot">
-      <span>Centene Platform Engineering</span>
-      <span aria-hidden="true">/</span>
-      <span class="mono">GitLab API v4</span>
-    </footer>
+    <footer class="foot"><span>Platform Engineering</span><span aria-hidden="true">/</span><span class="mono">GitLab API v4</span></footer>
   </main>
 </div>

@@ -4,18 +4,15 @@
   "description": "Backend API for GitLab Repo Creator",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "axios": "^1.18.1",
-    "body-parser": "^2.3.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "form-data": "^4.0.6",
     "fs-extra": "^11.3.6",
-    "glob": "^13.0.6",
-    "simple-git": "^3.36.0",
-    "tar": "^7.5.20"
+    "simple-git": "^3.36.0"
   },
   "overrides": {
     "follow-redirects": ">=1.16.0",

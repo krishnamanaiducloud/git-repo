@@ -46,12 +46,18 @@ RUN apk upgrade --no-cache \
         bash \
         htop \
     && update-ca-certificates \
-    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -rf /opt/yarn \
+             /opt/yarn-v* \
+             /usr/local/lib/node_modules/npm \
              /usr/local/bin/npm \
              /usr/local/bin/npx \
-             /usr/local/bin/corepack
+             /usr/local/bin/corepack \
+             /usr/local/bin/yarn \
+             /usr/local/bin/yarnpkg
 
-ENV NODE_ENV=production \
+ENV HOME=/tmp \
+    TMPDIR=/tmp \
+    NODE_ENV=production \
     PORT=3000
 
 WORKDIR /app/backend
@@ -61,15 +67,17 @@ COPY --from=backend-build /app/backend /app/backend
 RUN mkdir -p /app/backend/public/browser
 COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
 
-RUN rm -rf /app/frontend /app/node_module /root/.npm /usr/local/lib/node_modules
+RUN rm -rf /app/frontend /app/node_modules /root/.npm /usr/local/lib/node_modules
 
-RUN chgrp -R 0 /app && chmod -R g+rwX /app
+RUN chgrp -R 0 /app \
+    && chmod -R g+rX /app \
+    && chmod -R a-w /app
 
 RUN addgroup -g 1001 appuser && \
     adduser -D -u 1001 -G appuser appuser && \
     adduser appuser root
 
-USER 1001
+USER 1001:0
 
 EXPOSE 3000
 

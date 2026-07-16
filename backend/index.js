@@ -1,22 +1,87 @@
 // backend/index.js
 const express = require('express');
 const axios = require('axios');
-const bodyParser = require('body-parser');
 const simpleGit = require('simple-git');
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
+const { randomBytes, randomUUID } = require('crypto');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = Number.parseInt(process.env.PORT || '3000', 10);
+
+function normalizeBasePath(value = '/') {
+  const candidate = `/${String(value).trim()}`.replace(/\/{2,}/g, '/').replace(/\/+$/, '') || '/';
+  const segments = candidate.split('/').filter(Boolean);
+  if (
+    !/^\/[A-Za-z0-9/_-]*$/.test(candidate) ||
+    segments.some((segment) => segment === '.' || segment === '..')
+  ) {
+    throw new Error('BASE_PATH may contain only URL path letters, numbers, underscores, and hyphens');
+  }
+  return candidate;
+}
 
 // -------------------------
 // Dynamic base path for OpenShift Route / Istio VirtualService
 // Set BASE_PATH=/git-repo when serving under a sub-path.
 // -------------------------
-const BASE_PATH = (process.env.BASE_PATH || '/').replace(/\/+$/, '') || '/';
+const BASE_PATH = normalizeBasePath(process.env.BASE_PATH || '/');
 let isReady = false;
+let configurationReady = false;
+
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  const styleNonce = randomBytes(18).toString('base64');
+  res.locals.styleNonce = styleNonce;
+  const suppliedRequestId = req.get('x-request-id');
+  const requestId = suppliedRequestId && /^[A-Za-z0-9._:-]{1,100}$/.test(suppliedRequestId)
+    ? suppliedRequestId
+    : randomUUID();
+  const startedAt = Date.now();
+  res.setHeader('X-Request-Id', requestId);
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    "object-src 'none'",
+    `script-src 'self' 'nonce-${styleNonce}'`,
+    `style-src 'self' 'nonce-${styleNonce}'`
+  ].join('; '));
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  if (req.secure || req.get('x-forwarded-proto') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  res.on('finish', () => {
+    console.log(JSON.stringify({
+      level: 'info',
+      requestId,
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt
+    }));
+  });
+  next();
+});
+
+app.use((req, res, next) => {
+  if (req.method === 'TRACE' || req.method === 'CONNECT') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  next();
+});
 
 // -------------------------
 // Health probes — root level, always reachable by k8s/OpenShift
@@ -26,7 +91,8 @@ app.get('/healthz', (req, res) => {
 });
 
 app.get('/readyz', (req, res) => {
-  res.status(isReady ? 200 : 503).send(isReady ? 'ok' : 'not ready');
+  const ready = isReady && configurationReady;
+  res.status(ready ? 200 : 503).send(ready ? 'ok' : 'not ready');
 });
 
 // -------------------------
@@ -34,27 +100,60 @@ app.get('/readyz', (req, res) => {
 // -------------------------
 const router = express.Router();
 
-router.use(bodyParser.json({ limit: '1mb' }));
+router.use(express.json({ limit: '32kb', type: 'application/json' }));
 
 router.use(
   express.static(path.join(__dirname, 'public/browser'), {
+    index: false,
     setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
-      }
+      const fileName = path.basename(filePath);
+      res.setHeader(
+        'Cache-Control',
+        fileName === 'index.html'
+          ? 'no-store'
+          : /-[A-Z0-9]{8,}\./i.test(fileName)
+            ? 'public, max-age=31536000, immutable'
+            : 'public, max-age=3600'
+      );
     }
   })
 );
+
+const spaIndexPath = path.join(__dirname, 'public/browser', 'index.html');
+
+function applyCspNonce(html, nonce) {
+  if (!html.includes('__CSP_NONCE__')) {
+    throw new Error('SPA index is missing its CSP nonce placeholder');
+  }
+  return html.replaceAll('__CSP_NONCE__', nonce);
+}
+
+async function sendSpaIndex(req, res, next) {
+  try {
+    const html = await fs.readFile(spaIndexPath, 'utf8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(applyCspNonce(html, res.locals.styleNonce));
+  } catch (error) {
+    next(error);
+  }
+}
+
+router.get('/', sendSpaIndex);
 
 // -------------------------
 // GitLab configuration
 // -------------------------
 const GITLAB_API_URL =
   process.env.GITLAB_API_URL || 'https://gitlab.example.com/api/v4';
+const GITLAB_WEB_URL = process.env.GITLAB_WEB_URL || new URL(GITLAB_API_URL).origin;
 const GITLAB_TOKEN = process.env.GITLAB_TOKEN;
 const TEMPLATE_REPO_PREFIX =
   process.env.TEMPLATE_REPO_PREFIX ||
   'https://gitlab.centene.com/embark/templates-projects/';
+
+axios.defaults.timeout = Number.parseInt(process.env.GITLAB_TIMEOUT_MS || '30000', 10);
+axios.defaults.maxContentLength = 10 * 1024 * 1024;
+axios.defaults.maxBodyLength = 10 * 1024 * 1024;
 
 if (!GITLAB_TOKEN) {
   console.warn(
@@ -79,13 +178,52 @@ function parseJsonEnv(name, fallback) {
 const namespaceMap = parseJsonEnv('NAMESPACE_MAP', {});
 const templateMap = parseJsonEnv('TEMPLATE_MAP', {});
 
+function validHttpsUrl(value, name) {
+  try {
+    const url = new URL(value);
+    const insecureAllowed = process.env.ALLOW_INSECURE_GITLAB === 'true';
+    if (url.protocol !== 'https:' && !(insecureAllowed && url.protocol === 'http:')) {
+      throw new Error('HTTPS is required');
+    }
+    if (url.username || url.password) {
+      throw new Error('credentials must not be embedded in the URL');
+    }
+    return true;
+  } catch (error) {
+    console.error(`${name} is invalid: ${error.message}`);
+    return false;
+  }
+}
+
+configurationReady = Boolean(
+  GITLAB_TOKEN &&
+  Object.keys(namespaceMap).length &&
+  Object.keys(templateMap).length &&
+  validHttpsUrl(GITLAB_API_URL, 'GITLAB_API_URL') &&
+  validHttpsUrl(GITLAB_WEB_URL, 'GITLAB_WEB_URL') &&
+  validHttpsUrl(TEMPLATE_REPO_PREFIX, 'TEMPLATE_REPO_PREFIX')
+);
+
 const validArtifactTypes = {
   Go: ['Image', 'Library'],
   Java: ['Image', 'Library', 'Kjar'],
   Javascript: ['Image', 'Library']
 };
+const PROJECT_VISIBILITY = 'private';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function redactSensitive(value) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value) || String(value);
+  return GITLAB_TOKEN ? text.replaceAll(GITLAB_TOKEN, '[REDACTED]') : text;
+}
+
+function authenticatedGitUrl(value) {
+  const url = new URL(value);
+  url.username = 'oauth2';
+  url.password = GITLAB_TOKEN;
+  return url.toString();
+}
 
 // -------------------------
 // Helper functions
@@ -332,7 +470,7 @@ async function retryGitPush(gitRepo, args, retries = 5, delayMs = 2000) {
       lastError = err;
       console.error(
         `❌ Git push failed (attempt ${attempt}/${retries}):`,
-        err.message
+        redactSensitive(err.message)
       );
       await sleep(delayMs);
     }
@@ -359,19 +497,86 @@ router.get('/api/config/subgroups', (req, res) => {
 // -------------------------
 // API: create GitLab repo
 // -------------------------
-router.post('/api/create_repo', async (req, res) => {
-  const tmpDir = path.join(os.tmpdir(), `repo-${Date.now()}`);
+const creationAttempts = new Map();
+const idempotencyKeys = new Map();
+const creationWindowMs = 10 * 60 * 1000;
+const creationLimit = Math.max(1, Number.parseInt(process.env.CREATE_RATE_LIMIT || '5', 10));
+const maxTrackedCreationClients = 10_000;
+const maxTrackedIdempotencyKeys = 10_000;
+
+function creationRateLimit(req, res, next) {
+  const now = Date.now();
+  for (const [candidate, timestamps] of creationAttempts) {
+    const active = timestamps.filter((timestamp) => now - timestamp < creationWindowMs);
+    if (active.length) creationAttempts.set(candidate, active);
+    else creationAttempts.delete(candidate);
+  }
+  const key = req.ip || 'unknown';
+  if (!creationAttempts.has(key) && creationAttempts.size >= maxTrackedCreationClients) {
+    res.setHeader('Retry-After', '60');
+    return res.status(429).json({ error: 'Repository creation is temporarily rate limited' });
+  }
+  const recent = creationAttempts.get(key) || [];
+  if (recent.length >= creationLimit) {
+    res.setHeader('Retry-After', Math.ceil((creationWindowMs - (now - recent[0])) / 1000));
+    return res.status(429).json({ error: 'Too many repository creation requests. Try again later.' });
+  }
+  recent.push(now);
+  creationAttempts.set(key, recent);
+  next();
+}
+
+function rejectDuplicateRequest(req, res, next) {
+  const now = Date.now();
+  for (const [key, timestamp] of idempotencyKeys) {
+    if (now - timestamp >= creationWindowMs) idempotencyKeys.delete(key);
+  }
+  const key = req.get('idempotency-key');
+  if (!key) return next();
+  if (!/^[A-Za-z0-9._:-]{8,100}$/.test(key)) {
+    return res.status(400).json({ error: 'Invalid Idempotency-Key header' });
+  }
+  if (idempotencyKeys.has(key)) {
+    return res.status(409).json({ error: 'This repository creation request was already received. Check GitLab before retrying.' });
+  }
+  if (idempotencyKeys.size >= maxTrackedIdempotencyKeys) {
+    res.setHeader('Retry-After', '60');
+    return res.status(429).json({ error: 'Repository creation is temporarily rate limited' });
+  }
+  idempotencyKeys.set(key, now);
+  next();
+}
+
+router.post('/api/create_repo', creationRateLimit, rejectDuplicateRequest, async (req, res) => {
+  let tmpDir = null;
   let project_id = null;
 
   try {
-    const { projectName, subgroup, technology, artifactType, ownerInfo } =
-      req.body || {};
+    if (!configurationReady) {
+      return res.status(503).json({ error: 'Repository creation is not configured' });
+    }
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const projectName = typeof body.projectName === 'string' ? body.projectName.trim() : '';
+    const subgroup = typeof body.subgroup === 'string' ? body.subgroup.trim() : '';
+    const technology = typeof body.technology === 'string' ? body.technology.trim() : '';
+    const artifactType = typeof body.artifactType === 'string' ? body.artifactType.trim() : '';
+    const ownerInfo = typeof body.ownerInfo === 'string' ? body.ownerInfo.trim() : '';
 
     if (!projectName || !subgroup || !technology || !artifactType) {
       return res.status(400).json({
         error:
           'Missing required fields: projectName, subgroup, technology, artifactType'
       });
+    }
+
+    if (!/^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])$/.test(projectName)) {
+      return res.status(400).json({
+        error: 'Project name must be 2-63 characters, start and end with a letter or number, and contain only letters, numbers, underscores, or hyphens'
+      });
+    }
+    if (ownerInfo.length > 200 || /[\u0000-\u001F\u007F]/.test(ownerInfo)) {
+      return res.status(400).json({ error: 'Owner info is invalid or exceeds 200 characters' });
     }
 
     const namespace_id = namespaceMap[subgroup];
@@ -399,6 +604,8 @@ router.post('/api/create_repo', async (req, res) => {
         .json({ error: 'Template mapping failed' });
     }
 
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-'));
+
     console.log('🚀 Creating GitLab project:', {
       projectName,
       subgroup,
@@ -416,7 +623,7 @@ router.post('/api/create_repo', async (req, res) => {
           .toLowerCase()
           .replace(/[^a-z0-9-]/g, '-'),
         namespace_id,
-        visibility: 'internal',
+        visibility: PROJECT_VISIBILITY,
         description: `Owner: ${
           ownerInfo || 'N/A'
         }, Technology: ${technology}, Artifact: ${artifactType}`
@@ -437,10 +644,7 @@ router.post('/api/create_repo', async (req, res) => {
     await waitForRepoReady(project_id);
 
     const git = simpleGit();
-    const templateCloneUrl = `https://oauth2:${GITLAB_TOKEN}@${repoUrl.replace(
-      'https://',
-      ''
-    )}`;
+    const templateCloneUrl = authenticatedGitUrl(repoUrl);
 
     console.log(`ℹ️ Cloning template repo from ${repoUrl}`);
     await git.clone(templateCloneUrl, tmpDir);
@@ -448,13 +652,16 @@ router.post('/api/create_repo', async (req, res) => {
     const gitCloned = simpleGit(tmpDir);
     await gitCloned.removeRemote('origin');
 
-    const targetRepoUrl = `https://oauth2:${GITLAB_TOKEN}@gitlab.centene.com/${projectPath}.git`;
+    const targetRepoUrl = authenticatedGitUrl(
+      new URL(`${projectPath}.git`, `${GITLAB_WEB_URL.replace(/\/+$/, '')}/`).toString()
+    );
     await gitCloned.addRemote('origin', targetRepoUrl);
 
     console.log('ℹ️ Pushing template contents to master (with retries)...');
     await retryGitPush(gitCloned, ['-u', 'origin', 'HEAD:master', '--force']);
 
     await fs.remove(tmpDir);
+    tmpDir = null;
     console.log('✅ Template repo synced and temp dir removed');
 
     await axios.put(
@@ -603,12 +810,14 @@ router.post('/api/create_repo', async (req, res) => {
   } catch (error) {
     console.error(
       '❌ Error creating GitLab project:',
-      error.response?.data || error.message
+      redactSensitive(error.response?.data || error.message)
     );
-    try {
-      await fs.remove(tmpDir);
-    } catch (_) {
-      // ignore cleanup error
+    if (tmpDir) {
+      try {
+        await fs.remove(tmpDir);
+      } catch (_) {
+        // Ignore cleanup errors; the pod's ephemeral /tmp is discarded on restart.
+      }
     }
 
     // (Optional) If you want, you could delete the partially created project here:
@@ -627,6 +836,16 @@ router.post('/api/create_repo', async (req, res) => {
   }
 });
 
+router.get('/healthz', (req, res) => res.status(200).send('ok'));
+router.get('/readyz', (req, res) => {
+  const ready = isReady && configurationReady;
+  res.status(ready ? 200 : 503).send(ready ? 'ok' : 'not ready');
+});
+
+router.use('/api', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
 // -------------------------
 // SPA fallback (Angular) — skip /api paths so they 404 cleanly
 // -------------------------
@@ -634,38 +853,65 @@ router.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return next();
   }
-  res.sendFile(
-    path.join(__dirname, 'public/browser', 'index.html')
-  );
+  return sendSpaIndex(req, res, next);
 });
 
 // -------------------------
 // Mount router at the configured base path
 // -------------------------
+if (BASE_PATH !== '/') {
+  app.use((req, res, next) => {
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.path === BASE_PATH) {
+      const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+      return res.redirect(308, `${BASE_PATH}/${query}`);
+    }
+    next();
+  });
+}
 app.use(BASE_PATH, router);
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = error instanceof SyntaxError && 'body' in error ? 400 : 500;
+  if (status === 500) console.error('Unhandled request error:', redactSensitive(error.message));
+  res.status(status).json({ error: status === 400 ? 'Malformed JSON request' : 'Internal server error' });
+});
 
 // -------------------------
 // Start server + graceful shutdown
 // -------------------------
-const server = app.listen(port, () => {
-  isReady = true;
-  console.log(
-    `GitLab Repo Creator running on port ${port} (BASE_PATH=${BASE_PATH})`
-  );
-});
+let server;
+
+function startServer(listenPort = port) {
+  if (server) return server;
+  server = app.listen(listenPort, () => {
+    isReady = true;
+    const address = server.address();
+    const activePort = typeof address === 'object' && address ? address.port : listenPort;
+    console.log(`GitLab Repo Creator running on port ${activePort} (BASE_PATH=${BASE_PATH})`);
+  });
+  return server;
+}
 
 function gracefulShutdown(signal) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
   isReady = false;
+  if (!server) return;
   server.close(() => {
     console.log('HTTP server closed.');
     process.exit(0);
   });
-  setTimeout(() => {
+  const forcedShutdown = setTimeout(() => {
     console.error('Forced shutdown after timeout.');
     process.exit(1);
-  }, 10_000);
+  }, 25_000);
+  forcedShutdown.unref();
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+if (require.main === module) {
+  startServer();
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+module.exports = { app, applyCspNonce, startServer, normalizeBasePath, PROJECT_VISIBILITY };

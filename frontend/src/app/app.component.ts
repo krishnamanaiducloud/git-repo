@@ -1,134 +1,144 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { FormBuilder, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { finalize, timeout } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+interface SubgroupOption {
+  label: string;
+  value: string;
+}
+
+interface CreateRepositoryResponse {
+  message: string;
+  project_url: string;
+}
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    ReactiveFormsModule,
-    MatProgressSpinnerModule
-  ],
+  imports: [ReactiveFormsModule],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrl: './app.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
+  private readonly fb = inject(FormBuilder);
+  private readonly http = inject(HttpClient);
+  private readonly destroyRef = inject(DestroyRef);
 
-  form: FormGroup;
-  createdProjectUrl: string | null = null;
-  progress: number = 0;
-  private progressInterval: ReturnType<typeof setInterval> | null = null;
+  readonly form = this.fb.nonNullable.group({
+    projectName: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(2),
+        Validators.maxLength(63),
+        Validators.pattern(/^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])$/)
+      ]
+    ],
+    subgroup: ['', Validators.required],
+    technology: ['', Validators.required],
+    artifactType: ['', Validators.required],
+    ownerInfo: ['', Validators.maxLength(200)]
+  });
 
-  subgroups: Array<{ label: string; value: string }> = [];
+  readonly subgroups = signal<SubgroupOption[]>([]);
+  readonly artifactTypes = signal<string[]>([]);
+  readonly createdProjectUrl = signal<string | null>(null);
+  readonly isSubmitting = signal(false);
+  readonly isLoadingConfig = signal(true);
+  readonly errorMessage = signal<string | null>(null);
 
-  technologies = ['Go', 'Java', 'Javascript'];
-
-  artifactTypesByTechnology: Record<string, string[]> = {
+  readonly technologies = ['Go', 'Java', 'Javascript'] as const;
+  readonly artifactTypesByTechnology: Readonly<Record<string, readonly string[]>> = {
     Go: ['Image', 'Library'],
     Java: ['Image', 'Library', 'Kjar'],
     Javascript: ['Image', 'Library']
   };
 
-  artifactTypes: string[] = [];
-
-  constructor(private fb: FormBuilder, private http: HttpClient) {
-    this.form = this.fb.group({
-      projectName: ['', Validators.required],
-      subgroup: ['', Validators.required],
-      technology: ['', Validators.required],
-      artifactType: ['', Validators.required],
-      ownerInfo: ['']
-    });
-  }
-
-  ngOnInit() {
+  constructor() {
     this.loadSubgroups();
-    this.form.get('technology')?.valueChanges.subscribe(selectedTech => {
-      this.artifactTypes = this.artifactTypesByTechnology[selectedTech] || [];
-      this.form.controls['artifactType'].setValue('');
-    });
+    this.form.controls.technology.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((technology) => {
+        this.artifactTypes.set([...(this.artifactTypesByTechnology[technology] ?? [])]);
+        this.form.controls.artifactType.setValue('');
+      });
   }
 
-  /**
-   * Use relative API paths (NO leading slash)
-   * This makes the app work at:
-   *   /
-   *   /git-repo
-   *   /git-repo/
-   *   /some/other/path/
-   * Regardless of hostname or domain.
-   */
-  loadSubgroups() {
-    this.http.get<any[]>('api/config/subgroups').subscribe({
-      next: (data) => {
-        this.subgroups = data;
-      },
-      error: (error) => {
-        console.error('Failed to load subgroups', error);
-      }
-    });
-  }
-
-  private startProgressSimulation(): void {
-    this.clearProgressInterval();
-    this.progressInterval = setInterval(() => {
-      if (this.progress < 95) {
-        this.progress += 5;
-      } else {
-        this.clearProgressInterval();
-      }
-    }, 800);
-  }
-
-  private clearProgressInterval(): void {
-    if (this.progressInterval !== null) {
-      clearInterval(this.progressInterval);
-      this.progressInterval = null;
-    }
-  }
-
-  /**
-   * API call uses "api/create_repo" (relative)
-   * Works behind:
-   *  - Istio VirtualService
-   *  - OpenShift Route
-   *  - LoadBalancer
-   *  - Any reverse proxy
-   */
-  submitForm() {
-    if (this.form.valid) {
-      this.progress = 10;
-      this.startProgressSimulation();
-
-      this.http.post('api/create_repo', this.form.value).subscribe({
-        next: (response: any) => {
-          this.clearProgressInterval();
-          this.progress = 100;
-          console.log('Project created:', response.project_url);
-          this.createdProjectUrl = response.project_url;
-        },
-        error: (error) => {
-          this.clearProgressInterval();
-          this.progress = 0;
-          console.error('Error creating project:', error);
-          alert('Error: ' + (error.error?.error || 'Unknown error'));
+  loadSubgroups(): void {
+    this.isLoadingConfig.set(true);
+    this.errorMessage.set(null);
+    this.http
+      .get<SubgroupOption[]>('api/config/subgroups')
+      .pipe(timeout(10_000), finalize(() => this.isLoadingConfig.set(false)))
+      .subscribe({
+        next: (data) => this.subgroups.set(data),
+        error: () => {
+          this.subgroups.set([]);
+          this.errorMessage.set('Repository configuration could not be loaded. Retry or contact Platform Engineering.');
         }
       });
-    } else {
-      alert('Please fill all required fields.');
+  }
+
+  submitForm(): void {
+    this.errorMessage.set(null);
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.errorMessage.set('Review the highlighted fields before creating the repository.');
+      this.focusFirstInvalidControl();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.http
+      .post<CreateRepositoryResponse>('api/create_repo', this.form.getRawValue(), {
+        headers: { 'Idempotency-Key': crypto.randomUUID() }
+      })
+      .pipe(timeout(300_000), finalize(() => this.isSubmitting.set(false)))
+      .subscribe({
+        next: (response) => {
+          const projectUrl = this.validHttpUrl(response.project_url);
+          if (!projectUrl) {
+            this.errorMessage.set('The repository was created, but GitLab returned an invalid project link.');
+            return;
+          }
+          this.createdProjectUrl.set(projectUrl);
+        },
+        error: (error: { error?: { error?: string }; name?: string }) => {
+          const message = error.name === 'TimeoutError'
+            ? 'Repository creation is taking longer than expected. Check GitLab before retrying to avoid a duplicate request.'
+            : error.error?.error || 'Repository creation failed. Your form has been preserved so you can retry.';
+          this.errorMessage.set(message);
+        }
+      });
+  }
+
+  resetForm(): void {
+    this.form.reset();
+    this.artifactTypes.set([]);
+    this.createdProjectUrl.set(null);
+    this.errorMessage.set(null);
+  }
+
+  fieldInvalid(name: keyof typeof this.form.controls): boolean {
+    const control = this.form.controls[name];
+    return control.invalid && (control.dirty || control.touched);
+  }
+
+  private focusFirstInvalidControl(): void {
+    queueMicrotask(() => {
+      document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+    });
+  }
+
+  private validHttpUrl(value: string): string | null {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+    } catch {
+      return null;
     }
   }
-
-  resetForm() {
-    this.clearProgressInterval();
-    this.form.reset();
-    this.createdProjectUrl = null;
-    this.artifactTypes = [];
-    this.progress = 0;
-  }
 }
-
