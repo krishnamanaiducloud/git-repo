@@ -227,3 +227,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (prefers-color-scheme: dark) {
+  .page__bg {
+    background:
+      linear-gradient(180deg, rgba(9, 14, 26, 0.97), rgba(7, 11, 22, 0.99)),
+      var(--bg);
+  }
+
+  .grid {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  }
+
+  .step {
+    background: rgba(16, 24, 40, 0.6);
+  }
+
+  .skip-link {
+    color: var(--bg);
+    background: var(--ink);
+  }
+}

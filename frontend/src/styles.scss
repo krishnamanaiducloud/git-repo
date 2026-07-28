@@ -577,3 +577,96 @@ code,
     align-items: flex-start;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Modern 2026 enterprise polish layer
+   – automatic dark mode + refined micro-interactions
+   ══════════════════════════════════════════════════════════════════ */
+
+.card {
+  transition: var(--transition);
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(37, 99, 235, 0.06);
+}
+
+.topbar__meta,
+.link-pill {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0a101e;
+    --bg-deep: #070b16;
+    --surface: #101828;
+    --surface-alt: #0d1424;
+
+    --ink: #e7edf8;
+    --ink-soft: #b3c1d8;
+    --ink-mute: #8598b3;
+    --ink-faint: #5d7089;
+
+    --line: #20304b;
+    --line-strong: #31466b;
+
+    --accent: #4c86ff;
+    --accent-2: #2dd4bf;
+    --accent-deep: #77a4ff;
+    --accent-soft: rgba(76, 134, 255, 0.13);
+
+    --success: #34d399;
+    --success-soft: rgba(16, 185, 129, 0.12);
+    --danger: #fb7185;
+    --danger-soft: rgba(244, 63, 94, 0.12);
+    --warning: #fbbf24;
+    --warning-soft: rgba(217, 119, 6, 0.14);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.5);
+    --shadow-ring: 0 0 0 4px rgba(76, 134, 255, 0.2);
+  }
+
+  body {
+    background: var(--bg);
+  }
+
+  .topbar {
+    background: rgba(10, 16, 30, 0.82);
+  }
+
+  ::selection {
+    color: #fff;
+    background: rgba(76, 134, 255, 0.4);
+  }
+
+  .alert--error {
+    color: #fecaca;
+  }
+
+  .field__input:hover,
+  .field__input:focus {
+    background: #0f1830;
+  }
+
+  .field__icon {
+    border-color: rgba(76, 134, 255, 0.25);
+  }
+
+  .loading {
+    background: linear-gradient(135deg, rgba(76, 134, 255, 0.12), rgba(45, 212, 191, 0.07));
+    border-color: rgba(76, 134, 255, 0.24);
+  }
+
+  .success-icon {
+    border-color: rgba(52, 211, 153, 0.3);
+  }
+
+  .link-pill:hover {
+    border-color: rgba(76, 134, 255, 0.4);
+  }
+}

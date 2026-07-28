@@ -41,6 +41,7 @@ FROM ${NODE_IMAGE} AS runtime
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
+        c-ares \
         git \
         ca-certificates \
     && update-ca-certificates \
