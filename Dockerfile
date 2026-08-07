@@ -1,8 +1,8 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-ARG NODE_IMAGE=node:24.18.0-alpine3.24@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
-ARG NPM_VERSION=12.0.1
+ARG NODE_IMAGE=node:26.6.0-alpine3.24@sha256:a4fb14143ee24c038c851864fe85fd90f9121abc8fdca3092798bcc02e06b1d8
+ARG NPM_VERSION=12.0.2
 
 FROM ${NODE_IMAGE} AS backend-build
 ARG NPM_VERSION
@@ -87,4 +87,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["node", "index.js"]
-
