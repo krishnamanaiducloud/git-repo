@@ -1,0 +1,59 @@
+name: Container security
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - Dockerfile-debug
+      - backend/**
+      - frontend/**
+      - .github/workflows/container-security.yml
+  push:
+    branches:
+      - prod-07-28-2026
+    paths:
+      - Dockerfile
+      - Dockerfile-debug
+      - backend/**
+      - frontend/**
+      - .github/workflows/container-security.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build --pull --tag git-repo:${GITHUB_SHA} .
+
+      - name: Scan all known OS and library vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: git-repo:${{ github.sha }}
+          scan-type: image
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: table
+
+      - name: Smoke-test the container
+        run: |
+          container_id=$(docker run --detach --read-only --tmpfs /tmp:rw,noexec,nosuid,size=2g --publish 3000:3000 git-repo:${GITHUB_SHA})
+          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1

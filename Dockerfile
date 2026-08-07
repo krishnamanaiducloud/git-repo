@@ -1,12 +1,15 @@
 # ===========================================
 # Stage 1: Backend deps + build (if any)
 # ===========================================
-ARG NODE_IMAGE=node:26.6.0-alpine3.24@sha256:a4fb14143ee24c038c851864fe85fd90f9121abc8fdca3092798bcc02e06b1d8
+# Chainguard's -dev variant supplies npm for the build stages. The runtime also
+# needs the git executable because the backend uses simple-git.
+ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev
 ARG NPM_VERSION=12.0.2
 
 FROM ${NODE_IMAGE} AS backend-build
 ARG NPM_VERSION
 
+USER root
 RUN apk upgrade --no-cache \
     && npm install -g npm@${NPM_VERSION}
 WORKDIR /app/backend
@@ -22,6 +25,7 @@ COPY backend/ ./
 FROM ${NODE_IMAGE} AS frontend-build
 ARG NPM_VERSION
 
+USER root
 RUN apk upgrade --no-cache \
     && npm install -g npm@${NPM_VERSION}
 
@@ -35,25 +39,17 @@ COPY frontend/ ./
 RUN npm run build -- --configuration production
 
 # ===========================================
-# Stage 3: Runtime image (Alpine - Production)
+# Stage 3: Chainguard/Wolfi runtime
 # ===========================================
 FROM ${NODE_IMAGE} AS runtime
 
+USER root
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
-        c-ares \
         git \
-        ca-certificates \
-    && update-ca-certificates \
-    && (apk del --no-cache vim vim-common xxd 2>/dev/null || true) \
-    && rm -rf /opt/yarn \
-             /opt/yarn-v* \
-             /usr/local/lib/node_modules/npm \
-             /usr/local/bin/npm \
-             /usr/local/bin/npx \
-             /usr/local/bin/corepack \
-             /usr/local/bin/yarn \
-             /usr/local/bin/yarnpkg
+        ca-certificates-bundle \
+    && apk del --no-cache npm \
+    && rm -rf /root/.npm /var/cache/apk/*
 
 ENV HOME=/tmp \
     TMPDIR=/tmp \
@@ -62,28 +58,17 @@ ENV HOME=/tmp \
 
 WORKDIR /app/backend
 
-COPY --from=backend-build /app/backend /app/backend
+COPY --from=backend-build --chown=65532:0 /app/backend /app/backend
 
-RUN mkdir -p /app/backend/public/browser
-COPY --from=frontend-build /app/frontend/dist/frontend/browser /app/backend/public/browser
+COPY --from=frontend-build --chown=65532:0 /app/frontend/dist/frontend/browser /app/backend/public/browser
 
-RUN rm -rf /app/frontend /root/.npm /usr/local/lib/node_modules
-
-RUN chgrp -R 0 /app \
-    && chmod -R g+rX /app \
-    && chmod -R a-w /app
-
-RUN addgroup -g 1001 appuser && \
-    adduser -D -u 1001 -G appuser appuser && \
-    adduser appuser root
-
-USER 1001:0
+USER 65532:0
 
 EXPOSE 3000
 
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+  CMD ["node", "-e", "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
 CMD ["node", "index.js"]
