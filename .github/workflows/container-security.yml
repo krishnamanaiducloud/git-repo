@@ -1,6 +1,8 @@
 name: Container security
 
 on:
+  schedule:
+    - cron: '17 6 * * 1'
   pull_request:
     paths:
       - Dockerfile
@@ -31,6 +33,18 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Scan dependency manifests and lockfiles
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          vuln-type: library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: table
 
       - name: Build production image
         run: docker build --pull --tag git-repo:${GITHUB_SHA} .
