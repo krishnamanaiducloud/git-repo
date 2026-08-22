@@ -3,7 +3,7 @@
 # ===========================================
 # Chainguard's -dev variant supplies npm for the build stages. The runtime also
 # needs the git executable because the backend uses simple-git.
-ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:39708a466eb9e1c4a49abc6931dc8aaf8d3d4565fe6977a53bff0ce1c357a405
+ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:3e17362ebc0747052497d6ee6d8969d3b770b8261b0d15b386726eb57e05e92c
 ARG NPM_VERSION=12.0.2
 
 FROM ${NODE_IMAGE} AS backend-build
@@ -15,7 +15,8 @@ RUN apk upgrade --no-cache \
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefer-offline
 
 COPY backend/ ./
 
@@ -32,7 +33,8 @@ RUN apk upgrade --no-cache \
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci --ignore-scripts --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefer-offline
 
 COPY frontend/ ./
 
