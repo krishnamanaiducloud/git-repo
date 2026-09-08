@@ -3,7 +3,7 @@
 # ===========================================
 # Chainguard's -dev variant supplies npm for the build stages. The runtime also
 # needs the git executable because the backend uses simple-git.
-ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:c14f79235064d92d270d82939f52dfc6b68a9728771655857b885b62348532d1
+ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:ce6b1c8874bb1dd21ba3fb915b57dfa5897d65f9a3a62dd844f0b1a953a3b145
 ARG NPM_VERSION=12.0.2
 
 FROM ${NODE_IMAGE} AS backend-build
