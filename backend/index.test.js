@@ -70,8 +70,8 @@ describe('RepoForge HTTP server', () => {
     assert.throws(() => normalizeBasePath('/team/./admin'));
   });
 
-  it('creates projects with the private visibility promised by the UI', () => {
-    assert.equal(PROJECT_VISIBILITY, 'private');
+  it('creates projects with the internal visibility promised by the UI', () => {
+    assert.equal(PROJECT_VISIBILITY, 'internal');
   });
 
   it('serves health with defensive browser headers', async () => {

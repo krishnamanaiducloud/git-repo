@@ -9,7 +9,7 @@ RepoForge is a self-service Angular 22 application and Node.js API for creating 
 - Keyboard-visible focus, a skip link, live loading/error/success status, reduced-motion support, and responsive layouts.
 - Relative API calls plus a trailing-slash redirect make hashed assets and API calls work behind an OpenShift Route or Istio prefix without rewriting.
 - The Node API validates and limits request bodies, rate-limits project creation, accepts idempotency keys, redacts the GitLab token from errors, emits request IDs, and sends a restrictive CSP and other defensive headers.
-- The API is stateless. Multiple replicas are supported; GitLab remains the system of record. A repeated request reaching different replicas can still race, so GitLab's private-project namespace/path uniqueness is the final duplicate guard. Enforce a global rate limit at the authenticated ingress when a replica-independent quota is required.
+- The API is stateless. Multiple replicas are supported; GitLab remains the system of record. A repeated request reaching different replicas can still race, so GitLab's internal-project namespace/path uniqueness is the final duplicate guard. Enforce a global rate limit at the authenticated ingress when a replica-independent quota is required.
 
 ## Configuration
 

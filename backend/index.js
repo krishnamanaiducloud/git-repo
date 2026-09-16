@@ -209,7 +209,7 @@ const validArtifactTypes = {
   Java: ['Image', 'Library', 'Kjar'],
   Javascript: ['Image', 'Library']
 };
-const PROJECT_VISIBILITY = 'private';
+const PROJECT_VISIBILITY = 'internal';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

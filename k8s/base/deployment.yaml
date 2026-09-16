@@ -39,7 +39,7 @@ spec:
               app.kubernetes.io/name: gitlab-repo-creator
       containers:
         - name: gitlab-repo-creator
-          image: registry.example.com/platform/gitlab-repo-creator:prod-07-15-2026
+          image: registry.example.com/platform/gitlab-repo-creator:prod-09-16-2026
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
