@@ -4,6 +4,7 @@
 # Chainguard's -dev variant supplies npm for the build stages. The runtime also
 # needs the git executable because the backend uses simple-git.
 ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:5ce325a19f6941e2c922cb9110d3d0c6c555ca82d050bc2ef5d72254792bf243
+ARG RUNTIME_IMAGE=cgr.dev/chainguard/wolfi-base:latest@sha256:3754b6da0e1ccdab0fe46abfdd7bbbba994b593c28149f6659fa6597f2261aeb
 ARG NPM_VERSION=12.0.2
 
 FROM ${NODE_IMAGE} AS backend-build
@@ -15,8 +16,7 @@ RUN apk upgrade --no-cache \
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefer-offline
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefer-offline
 
 COPY backend/ ./
 
@@ -33,8 +33,7 @@ RUN apk upgrade --no-cache \
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefer-offline
+RUN npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefer-offline
 
 COPY frontend/ ./
 
@@ -43,14 +42,14 @@ RUN npm run build -- --configuration production
 # ===========================================
 # Stage 3: Chainguard/Wolfi runtime
 # ===========================================
-FROM ${NODE_IMAGE} AS runtime
+FROM ${RUNTIME_IMAGE} AS runtime
 
 USER root
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
+        nodejs \
         git \
         ca-certificates-bundle \
-    && apk del --no-cache npm \
     && rm -rf /root/.npm /var/cache/apk/*
 
 ENV HOME=/tmp \
