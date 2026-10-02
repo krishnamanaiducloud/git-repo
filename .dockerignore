@@ -6,6 +6,7 @@
 # ===========================================
 
 # Dependencies (must be installed inside the image, not copied from host)
+node_modules
 **/node_modules
 
 # Build outputs (regenerated inside the image)

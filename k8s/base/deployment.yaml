@@ -39,7 +39,7 @@ spec:
               app.kubernetes.io/name: gitlab-repo-creator
       containers:
         - name: gitlab-repo-creator
-          image: docker.io/mohankrishna999/git-repo:v54
+          image: docker.io/mohankrishna999/git-repo:v55
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

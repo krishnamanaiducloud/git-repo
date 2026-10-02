@@ -3,24 +3,17 @@
 # ===========================================
 # Chainguard's -dev variant supplies npm for the build stages. The runtime also
 # needs the git executable because the backend uses simple-git.
-ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:446b1779a5c4b3d5aca6b05d77b5d7a643eef87b34ec6ba5dc55fd0c9f81a6aa
-ARG RUNTIME_IMAGE=cgr.dev/chainguard/wolfi-base:latest@sha256:bef0f4d47edc72a93d1537eae54eb53db2b2cc352c028128ff0f16c5b5a3c1e4
-ARG NPM_VERSION=12.1.0
-ARG APK_REPOSITORY=https://packages.wolfi.dev/os
-ARG WOLFI_REPO_DIGEST=f0031424cf46f7db780ce63a45f0fd6aa6f85f601e6bb3b7a91fe3d4d5b7d2cc
+ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:c73a5061e27b54daadcd0175194a860986f026a40d8b7b77166e6af008ea503b
+ARG RUNTIME_IMAGE=cgr.dev/chainguard/wolfi-base:latest@sha256:82d42999b1bc4b2aa724b442d300194901e64563efec75b3245e41f4c09fb6d2
+ARG NPM_VERSION=12.0.2
+ARG APK_REPOSITORY=https://apk.cgr.dev/chainguard
 
 FROM ${NODE_IMAGE} AS backend-build
 ARG NPM_VERSION
-ARG APK_REPOSITORY
-ARG WOLFI_REPO_DIGEST
 
 USER root
-COPY wolfi-signing.rsa.pub /tmp/wolfi-signing.rsa.pub
-RUN echo "${WOLFI_REPO_DIGEST}  /tmp/wolfi-signing.rsa.pub" | sha256sum -c - \
-    && mv /tmp/wolfi-signing.rsa.pub /etc/apk/keys/wolfi-signing.rsa.pub \
-    && printf '%s\n' "${APK_REPOSITORY}" > /etc/apk/repositories \
-    && apk upgrade --no-cache \
-    && npm install -g npm@${NPM_VERSION}
+RUN npm install -g npm@${NPM_VERSION} \
+    && hash -r
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
@@ -33,16 +26,10 @@ COPY backend/ ./
 # ===========================================
 FROM ${NODE_IMAGE} AS frontend-build
 ARG NPM_VERSION
-ARG APK_REPOSITORY
-ARG WOLFI_REPO_DIGEST
 
 USER root
-COPY wolfi-signing.rsa.pub /tmp/wolfi-signing.rsa.pub
-RUN echo "${WOLFI_REPO_DIGEST}  /tmp/wolfi-signing.rsa.pub" | sha256sum -c - \
-    && mv /tmp/wolfi-signing.rsa.pub /etc/apk/keys/wolfi-signing.rsa.pub \
-    && printf '%s\n' "${APK_REPOSITORY}" > /etc/apk/repositories \
-    && apk upgrade --no-cache \
-    && npm install -g npm@${NPM_VERSION}
+RUN npm install -g npm@${NPM_VERSION} \
+    && hash -r
 
 WORKDIR /app/frontend
 
@@ -61,8 +48,8 @@ ARG APK_REPOSITORY
 
 USER root
 RUN printf '%s\n' "${APK_REPOSITORY}" > /etc/apk/repositories \
-    && apk upgrade --no-cache \
-    && apk add --no-cache \
+    && apk --timeout 60 upgrade --no-cache \
+    && apk --timeout 60 add --no-cache \
         nodejs \
         git \
         ca-certificates-bundle \
