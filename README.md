@@ -1,94 +1,110 @@
-# 🚀 GitLab Repo Creator – Production Bundle
+# RepoForge
 
-This project automates GitLab repository creation with a full-stack web interface built using Angular (frontend) and Node.js (backend). It's packaged into a production-ready Docker image and deployable to Kubernetes.
+RepoForge is a self-service Angular 22 application and Node.js API for creating GitLab projects from approved templates. The browser and API are served by the same origin, so the same image works at `/` or at a configured path such as `/git-repo/`.
 
----
+## Modern UI and runtime
 
-## 📦 Tech Stack
+- Standalone, zoneless Angular with signals, typed reactive forms, modern template control flow, and no Bootstrap, Material, remote-font, or icon-runtime dependency.
+- Inline validation and recoverable request errors; no browser alerts or simulated completion percentage.
+- Keyboard-visible focus, a skip link, live loading/error/success status, reduced-motion support, and responsive layouts.
+- Relative API calls plus a trailing-slash redirect make hashed assets and API calls work behind an OpenShift Route or Istio prefix without rewriting.
+- The Node API validates and limits request bodies, rate-limits project creation, accepts idempotency keys, redacts the GitLab token from errors, emits request IDs, and sends a restrictive CSP and other defensive headers.
+- The API is stateless. Multiple replicas are supported; GitLab remains the system of record. A repeated request reaching different replicas can still race, so GitLab's internal-project namespace/path uniqueness is the final duplicate guard. Enforce a global rate limit at the authenticated ingress when a replica-independent quota is required.
 
-- **Frontend**: Angular (`gitlab-repo-creator-frontend`)
-- **Backend**: Node.js (`backend/`)
-- **Containerization**: Docker (Multi-stage build)
-- **Deployment**: Kubernetes (via manifests in `k8s/` directory)
+## Configuration
 
----
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GITLAB_TOKEN` | yes | GitLab token supplied through a Secret or external secret controller |
+| `GITLAB_API_URL` | yes | HTTPS GitLab API v4 URL |
+| `GITLAB_WEB_URL` | yes | HTTPS GitLab web/git origin |
+| `TEMPLATE_REPO_PREFIX` | yes | HTTPS prefix containing approved template repositories |
+| `NAMESPACE_MAP` | yes | JSON object mapping visible subgroup names to GitLab namespace IDs |
+| `TEMPLATE_MAP` | yes | JSON object mapping generated template names to template IDs |
+| `BASE_PATH` | no | `/` by default; use `/git-repo` for the supplied path overlays |
+| `CREATE_RATE_LIMIT` | no | Per-pod create attempts per ten minutes; default `5` |
+| `GITLAB_TIMEOUT_MS` | no | Outbound GitLab HTTP timeout; default `30000` |
 
-## 🔧 Setup & Deployment
+`ALLOW_INSECURE_GITLAB=true` exists only for isolated local testing. Production configuration fails readiness when GitLab URLs are not HTTPS.
 
-### 1️⃣ Prepare the Frontend
-
-```bash
-ng new gitlab-repo-creator-frontend --strict --style=scss --routing=false
-# Copy the following into src/app/:
-# - app.component.ts
-# - app.component.html
-# - app.config.ts
-
-cd gitlab-repo-creator-frontend
-npm install
-ng build --configuration production
-```
-
-### 2️⃣ Setup the Backend
+## Local validation
 
 ```bash
 cd backend
-npm install
+npm ci
+npm test
+
+cd ../frontend
+npm ci
+npm run build
+npm test
 ```
 
-### 3️⃣ Build the Docker Image
+## Container release v56
+
+The build-only APK download stage verifies a signed repository index, resolves
+exact package versions, and installs them offline. Download tools, the package
+repository, and its cache are not copied into either final runtime image.
+
+Production and debug builds use refreshed, digest-pinned Chainguard images and
+verify the installed Wolfi glibc package satisfies `glibc>=2.44-r8`. npm 12.2.0
+is build-time tooling only. Angular CLI/build 22.2.2 and compiler 22.2.1 require
+TypeScript `>=6.0 <6.1`, so TypeScript remains on compatible 6.0.3 rather than
+the incompatible 7.x major. The Angular frontend is built and tested before
+publishing; the runtime starts the backend explicitly with `node index.js`.
+
+Template names are selected from `TEMPLATE_MAP`: the generic
+`template-<technology>-<artifact>` key is preferred, and an externally configured
+prefix remains supported when exactly one key matches that suffix. Ambiguous
+or unsafe names are rejected rather than selecting an arbitrary template.
+
+Run below `/git-repo`:
 
 ```bash
-cd ..
-docker build -t your-docker-repo/gitlab-repo-creator:latest .
+BASE_PATH=/git-repo \
+GITLAB_TOKEN=development-only \
+GITLAB_API_URL=https://gitlab.example.com/api/v4 \
+GITLAB_WEB_URL=https://gitlab.example.com \
+TEMPLATE_REPO_PREFIX=https://gitlab.example.com/approved-templates/ \
+NAMESPACE_MAP='{"team-alpha":101}' \
+TEMPLATE_MAP='{"template-go-image":201}' \
+node backend/index.js
 ```
 
-### 4️⃣ Deploy to Kubernetes
+Open `http://localhost:3000/git-repo/`. When `BASE_PATH=/`, open the origin root.
 
-Apply the necessary Kubernetes objects:
+## OpenShift and Istio
+
+The base manifests use a ClusterIP Service, two replicas, zero-downtime rolling updates, probes, resource bounds, a PDB, topology spreading, a read-only root filesystem, an ephemeral `/tmp`, dropped capabilities, `RuntimeDefault` seccomp, and no fixed UID. This is compatible with OpenShift's namespace-assigned arbitrary UID.
+
+Create the runtime Secret with External Secrets, Sealed Secrets, Vault, or your platform's secret workflow. `k8s/secret.example.yaml` is documentation and must not be applied unchanged.
+
+The OpenShift overlay is fail-closed behind an `oauth2-proxy` v7.15.3 sidecar. Register an OIDC client whose callback is the public `/git-repo/oauth2/callback` URL, then create `gitlab-repo-creator-oauth` from your secret manager. Required keys are shown in `k8s/openshift/oauth2-proxy-secret.example.yaml`; use one shared, randomly generated cookie secret for every replica. The Route targets only the proxy Service, while the application Service remains internal.
 
 ```bash
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
+# Inspect portable resources
+oc kustomize k8s/base
+
+# OpenShift Route at https://platform.apps.example.com/git-repo/
+oc apply -k k8s/openshift
+
+# Istio VirtualService at the same path
+oc apply -k k8s/istio
 ```
 
-### 5️⃣ Access the Application
+Before applying, replace the image, host, GitLab endpoints/maps, namespace, and—when different—the Istio gateway namespace/name. The NetworkPolicy permits the standard `openshift-ingress` and `istio-system` namespaces; update it if the gateway is elsewhere.
 
-```plaintext
-http://<node-ip>:31000
-```
+The Istio overlay explicitly requests sidecar injection and includes an `AuthorizationPolicy` that only accepts authenticated request principals. It requires a matching platform-managed `RequestAuthentication`/OIDC configuration; without one it intentionally denies traffic. The OpenShift Route terminates TLS and reaches only the OIDC proxy. Do not change it back to the application Service or add unauthenticated skip routes for this privileged repository-creation API.
 
-Replace `<node-ip>` with your actual Kubernetes node IP.
+The Route and VirtualService preserve `/git-repo`; they do not rewrite it. The application `BASE_PATH` must match that prefix. Requests to `/git-repo` are redirected to `/git-repo/` so relative assets resolve correctly.
 
----
+## Operational endpoints
 
-## 🔐 Security Highlights
+| Endpoint | Scope | Meaning |
+| --- | --- | --- |
+| `/healthz` | pod root | process liveness |
+| `/readyz` | pod root | listener is active and required GitLab/maps configuration is valid |
+| `<BASE_PATH>/api/config/subgroups` | application | safe UI configuration |
+| `<BASE_PATH>/api/create_repo` | application | repository creation |
 
-- ✅ Runs as **non-root** user inside the container
-- ✅ **Multi-stage Docker build** ensures minimal image size
-- ✅ GitLab **token stored securely** via Kubernetes Secret
-- ✅ **NamespaceMap** and **TemplateMap** injected via ConfigMap
-
----
-
-## 📁 Project Structure
-
-```plaintext
-final/
-├── backend/                        # Node.js backend
-├── gitlab-repo-creator-frontend/  # Angular frontend
-├── k8s/                            # Kubernetes manifests
-├── Dockerfile                      # Multi-stage build
-├── index.js                        # Optional backend entrypoint
-├── README.md
-└── .gitignore
-```
-
----
-
-## 🛠️ Maintainer
-
-- **Author**: Mohan
-- **Environment**: Linux / Docker / Kubernetes
+Terminate TLS at the Route/gateway, keep the Service internal, protect all UI/API paths with SSO, and forward/generate `X-Request-Id` for trace correlation.

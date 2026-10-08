@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-repo-creator
+spec:
+  template:
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.3@sha256:10a1165743a192e1940b4708fb9647027185ce11a681a1c5519b442ff7f1f561
+          imagePullPolicy: IfNotPresent
+          args:
+            - --provider=oidc
+            - --http-address=0.0.0.0:4180
+            - --upstream=http://127.0.0.1:3000
+            - --proxy-prefix=/git-repo/oauth2
+            - --cookie-path=/git-repo
+            - --cookie-name=__Secure-repoforge-auth
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            - --cookie-expire=8h
+            - --cookie-refresh=1h
+            - --email-domain=*
+            - --reverse-proxy=true
+            - --skip-provider-button=true
+            - --pass-access-token=false
+            - --pass-authorization-header=false
+            - --set-authorization-header=false
+            - --set-xauthrequest=false
+            - --silence-ping-logging=true
+          envFrom:
+            - secretRef:
+                name: gitlab-repo-creator-oauth
+          ports:
+            - name: oauth-proxy
+              containerPort: 4180
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: oauth-proxy
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: oauth-proxy
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: oauth-proxy
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true

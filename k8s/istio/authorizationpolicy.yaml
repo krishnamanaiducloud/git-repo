@@ -1,0 +1,13 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gitlab-repo-creator-authenticated-users
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitlab-repo-creator
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            requestPrincipals: ["*"]

@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gitlab-repo-creator
+spec:
+  hosts:
+    - platform.apps.example.com
+  gateways:
+    - istio-system/platform-gateway
+  http:
+    - match:
+        - uri:
+            exact: /git-repo
+      redirect:
+        uri: /git-repo/
+    - match:
+        - uri:
+            prefix: /git-repo/
+      timeout: 300s
+      route:
+        - destination:
+            host: gitlab-repo-creator
+            port:
+              number: 80

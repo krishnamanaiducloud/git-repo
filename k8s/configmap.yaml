@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gitlab-repo-creator-config
-data:
-  NAMESPACE_MAP: '{"<Project-name>":<Project-id>,"<Project-name>":<Project-id>}'
-  TEMPLATE_MAP: '{"<template-name>":<template-id>,"<template-name>":<template-id>}'

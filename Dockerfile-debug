@@ -1,0 +1,31 @@
+# Debug runtime: the tested production application plus an interactive shell.
+ARG PRODUCTION_IMAGE=mohankrishna999/git-repo:v56
+ARG APK_REPOSITORY=https://apk.cgr.dev/chainguard
+ARG APK_DOWNLOAD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:630df1be3733f7b38d1b535872904248adfe23fbea4befcb08da47cb7436ddb2
+
+FROM ${PRODUCTION_IMAGE} AS production
+FROM ${APK_DOWNLOAD_IMAGE} AS debug-packages
+ARG APK_REPOSITORY
+USER root
+COPY --from=production /usr/lib/apk/db/installed /tmp/apk-root/usr/lib/apk/db/installed
+COPY --from=production /etc/apk/world /tmp/apk-root/etc/apk/world
+COPY --from=production /etc/apk/keys/ /etc/apk/keys/
+COPY container/prepare-apk-repository.sh /usr/local/bin/prepare-apk-repository.sh
+RUN --mount=type=cache,id=node-release-apks,target=/tmp/apks,sharing=locked \
+    sh /usr/local/bin/prepare-apk-repository.sh "$APK_REPOSITORY" /tmp/apk-root bash
+
+FROM production AS debug
+ARG APK_REPOSITORY
+
+USER root
+RUN --mount=type=bind,from=debug-packages,source=/runtime-repository,target=/runtime-repository \
+    printf '%s\n' /runtime-repository > /etc/apk/repositories \
+    && apk --no-network --no-progress add --no-cache $(cat /runtime-repository/constraints) \
+    && glibc_version="$(awk '/^P:/ { package=$0 } /^V:/ && package == "P:glibc-2.44" { sub(/^V:/, ""); print; exit }' /usr/lib/apk/db/installed)" \
+    && test -n "$glibc_version" \
+    && glibc_comparison="$(apk version -t "$glibc_version" 2.44-r8)" \
+    && test "$glibc_comparison" != '<' \
+    && printf '%s\n' "$APK_REPOSITORY" > /etc/apk/repositories \
+    && rm -rf /var/cache/apk/*
+
+USER 65532:0
