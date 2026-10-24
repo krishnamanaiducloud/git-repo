@@ -40,6 +40,24 @@ npm run build
 npm test
 ```
 
+## Container release v56
+
+The build-only APK download stage verifies a signed repository index, resolves
+exact package versions, and installs them offline. Download tools, the package
+repository, and its cache are not copied into either final runtime image.
+
+Production and debug builds use refreshed, digest-pinned Chainguard images and
+verify the installed Wolfi glibc package satisfies `glibc>=2.44-r8`. npm 12.2.0
+is build-time tooling only. Angular CLI/build 22.2.2 and compiler 22.2.1 require
+TypeScript `>=6.0 <6.1`, so TypeScript remains on compatible 6.0.3 rather than
+the incompatible 7.x major. The Angular frontend is built and tested before
+publishing; the runtime starts the backend explicitly with `node index.js`.
+
+Template names are selected from `TEMPLATE_MAP`: the generic
+`template-<technology>-<artifact>` key is preferred, and an externally configured
+prefix remains supported when exactly one key matches that suffix. Ambiguous
+or unsafe names are rejected rather than selecting an arbitrary template.
+
 Run below `/git-repo`:
 
 ```bash
@@ -49,7 +67,7 @@ GITLAB_API_URL=https://gitlab.example.com/api/v4 \
 GITLAB_WEB_URL=https://gitlab.example.com \
 TEMPLATE_REPO_PREFIX=https://gitlab.example.com/approved-templates/ \
 NAMESPACE_MAP='{"team-alpha":101}' \
-TEMPLATE_MAP='{"embark-go-image":201}' \
+TEMPLATE_MAP='{"template-go-image":201}' \
 node backend/index.js
 ```
 

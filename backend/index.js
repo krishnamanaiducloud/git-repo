@@ -149,7 +149,7 @@ const GITLAB_WEB_URL = process.env.GITLAB_WEB_URL || new URL(GITLAB_API_URL).ori
 const GITLAB_TOKEN = process.env.GITLAB_TOKEN;
 const TEMPLATE_REPO_PREFIX =
   process.env.TEMPLATE_REPO_PREFIX ||
-  'https://gitlab.centene.com/embark/templates-projects/';
+  'https://gitlab.example.com/approved-templates/';
 
 axios.defaults.timeout = Number.parseInt(process.env.GITLAB_TIMEOUT_MS || '30000', 10);
 axios.defaults.maxContentLength = 10 * 1024 * 1024;
@@ -177,6 +177,21 @@ function parseJsonEnv(name, fallback) {
 
 const namespaceMap = parseJsonEnv('NAMESPACE_MAP', {});
 const templateMap = parseJsonEnv('TEMPLATE_MAP', {});
+
+function resolveTemplateName(technology, artifactType, configuredTemplates = templateMap) {
+  const suffix = artifactType.toLowerCase() === 'kjar'
+    ? 'java-image-kjar'
+    : `${technology.toLowerCase()}-${artifactType.toLowerCase()}`;
+  const preferred = `template-${suffix}`;
+  if (Object.hasOwn(configuredTemplates, preferred)) return preferred;
+  // Keep externally configured template prefixes compatible without embedding
+  // organization-specific repository names in the application.
+  const matches = Object.keys(configuredTemplates).filter((name) =>
+    /^[a-z0-9][a-z0-9._-]*$/i.test(name) &&
+    (name === suffix || name.endsWith(`-${suffix}`))
+  );
+  return matches.length === 1 ? matches[0] : undefined;
+}
 
 function validHttpsUrl(value, name) {
   try {
@@ -580,10 +595,7 @@ router.post('/api/create_repo', creationRateLimit, rejectDuplicateRequest, async
     }
 
     const namespace_id = namespaceMap[subgroup];
-    const template_name =
-      artifactType.toLowerCase() === 'kjar'
-        ? 'embark-java-image-kjar'
-        : `embark-${technology.toLowerCase()}-${artifactType.toLowerCase()}`;
+    const template_name = resolveTemplateName(technology, artifactType);
 
     const template_project_id = templateMap[template_name];
     const repoUrl = `${TEMPLATE_REPO_PREFIX}${template_name}.git`;
@@ -914,4 +926,4 @@ if (require.main === module) {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-module.exports = { app, applyCspNonce, startServer, normalizeBasePath, PROJECT_VISIBILITY };
+module.exports = { app, applyCspNonce, startServer, normalizeBasePath, resolveTemplateName, PROJECT_VISIBILITY };

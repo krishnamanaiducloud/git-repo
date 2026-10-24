@@ -8,6 +8,6 @@ data:
   GITLAB_WEB_URL: "https://gitlab.example.com"
   TEMPLATE_REPO_PREFIX: "https://gitlab.example.com/approved-templates/"
   NAMESPACE_MAP: '{"team-alpha":101,"team-beta":102}'
-  TEMPLATE_MAP: '{"embark-go-image":201,"embark-go-library":202,"embark-java-image":203,"embark-java-library":204,"embark-java-image-kjar":205,"embark-javascript-image":206,"embark-javascript-library":207}'
+  TEMPLATE_MAP: '{"template-go-image":201,"template-go-library":202,"template-java-image":203,"template-java-library":204,"template-java-image-kjar":205,"template-javascript-image":206,"template-javascript-library":207}'
   CREATE_RATE_LIMIT: "5"
   GITLAB_TIMEOUT_MS: "30000"

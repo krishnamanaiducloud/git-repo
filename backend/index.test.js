@@ -14,9 +14,9 @@ process.env.GITLAB_API_URL = 'https://gitlab.example.com/api/v4';
 process.env.GITLAB_WEB_URL = 'https://gitlab.example.com';
 process.env.TEMPLATE_REPO_PREFIX = 'https://gitlab.example.com/templates/';
 process.env.NAMESPACE_MAP = '{"Team A":101}';
-process.env.TEMPLATE_MAP = '{"embark-go-image":201}';
+process.env.TEMPLATE_MAP = '{"template-go-image":201}';
 
-const { applyCspNonce, normalizeBasePath, startServer, PROJECT_VISIBILITY } = require('./index');
+const { applyCspNonce, normalizeBasePath, startServer, resolveTemplateName, PROJECT_VISIBILITY } = require('./index');
 
 function request(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -72,6 +72,15 @@ describe('RepoForge HTTP server', () => {
 
   it('creates projects with the internal visibility promised by the UI', () => {
     assert.equal(PROJECT_VISIBILITY, 'internal');
+  });
+
+  it('resolves generic and externally configured template prefixes safely', () => {
+    assert.equal(resolveTemplateName('Go', 'Image', { 'template-go-image': 1 }), 'template-go-image');
+    assert.equal(resolveTemplateName('Go', 'Image', { 'approved-go-image': 2 }), 'approved-go-image');
+    assert.equal(resolveTemplateName('Java', 'Kjar', { 'approved-java-image-kjar': 3 }), 'approved-java-image-kjar');
+    assert.equal(resolveTemplateName('Go', 'Image', { 'first-go-image': 1, 'second-go-image': 2 }), undefined);
+    assert.equal(resolveTemplateName('Go', 'Image', { '../unsafe-go-image': 1 }), undefined);
+    assert.equal(resolveTemplateName('Go', 'Image', { 'not-go-library': 1 }), undefined);
   });
 
   it('serves health with defensive browser headers', async () => {

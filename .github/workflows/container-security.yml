@@ -12,7 +12,7 @@ on:
       - .github/workflows/container-security.yml
   push:
     branches:
-      - prod-07-28-2026
+      - main
       - chainguard
     paths:
       - Dockerfile
@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Scan dependency manifests and lockfiles
         uses: aquasecurity/trivy-action@v0.36.0
