@@ -48,7 +48,7 @@
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 620px);
+  grid-template-columns: minmax(280px, 1fr) minmax(420px, 620px);
   gap: 28px;
   align-items: start;
   max-width: 1120px;
@@ -78,7 +78,7 @@
 }
 
 .overview__panel {
-  padding: 4px 4px 0;
+  padding: 4px 0 0;
 }
 
 .overview__kicker {
@@ -225,6 +225,12 @@
 
   .overview__steps {
     grid-template-columns: 1fr;
+  }
+
+  .step {
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
   }
 }
 

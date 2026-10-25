@@ -1,7 +1,7 @@
 # Debug runtime: the tested production application plus an interactive shell.
-ARG PRODUCTION_IMAGE=mohankrishna999/git-repo:v56
+ARG PRODUCTION_IMAGE=mohankrishna999/git-repo:v57
 ARG APK_REPOSITORY=https://apk.cgr.dev/chainguard
-ARG APK_DOWNLOAD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:630df1be3733f7b38d1b535872904248adfe23fbea4befcb08da47cb7436ddb2
+ARG APK_DOWNLOAD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:c179c7d8e23caed59a51ff74d4742f8f8d3f16af4c33c40acaf8d3ee07234592
 
 FROM ${PRODUCTION_IMAGE} AS production
 FROM ${APK_DOWNLOAD_IMAGE} AS debug-packages
