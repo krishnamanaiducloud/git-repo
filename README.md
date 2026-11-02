@@ -40,7 +40,7 @@ npm run build
 npm test
 ```
 
-## Container release v57
+## Container release v58
 
 The build-only APK download stage verifies a signed repository index, resolves
 exact package versions, and installs them offline. Download tools, the package

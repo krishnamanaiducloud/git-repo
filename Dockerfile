@@ -3,11 +3,11 @@
 # ===========================================
 # Chainguard's -dev variant supplies npm for the build stages. The runtime also
 # needs the git executable because the backend uses simple-git.
-ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:13afe2c05d49286578b74c4a14b8e4bbe70e98828abeb3d0ea9f9fd2af4cc431
-ARG RUNTIME_IMAGE=cgr.dev/chainguard/wolfi-base:latest@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7
+ARG NODE_IMAGE=cgr.dev/chainguard/node:latest-dev@sha256:15c7b9f31bfbc87b78dca7adf6e8b518d7270ac425f8a346ed0e0be09fc60c53
+ARG RUNTIME_IMAGE=cgr.dev/chainguard/wolfi-base:latest@sha256:88a20e2d017bd20cdc0cb3910de603e7bea9512a6c351a8dd3c9df212ab03d73
 ARG NPM_VERSION=12.2.1
 ARG APK_REPOSITORY=https://apk.cgr.dev/chainguard
-ARG APK_DOWNLOAD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:c179c7d8e23caed59a51ff74d4742f8f8d3f16af4c33c40acaf8d3ee07234592
+ARG APK_DOWNLOAD_IMAGE=cgr.dev/chainguard/python:latest-dev@sha256:8a5780972067cfba4592b10e786a889807ed876c1100f89410fd0ed4e398992c
 
 FROM ${RUNTIME_IMAGE} AS runtime-base
 
