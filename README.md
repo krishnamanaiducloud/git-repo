@@ -40,19 +40,20 @@ npm run build
 npm test
 ```
 
-## Container release v58
+## Container release v59
 
 The build-only APK download stage verifies a signed repository index, resolves
 exact package versions, and installs them offline. Download tools, the package
 repository, and its cache are not copied into either final runtime image.
 
 Production and debug builds use refreshed, digest-pinned Chainguard images and
-verify the installed Wolfi glibc package satisfies `glibc>=2.44-r8`. npm 12.2.1
-is build-time tooling only. The backend moves to Express 5.3.0 and dotenv
-18.0.9, and resolves body-parser 2.4.0 for CVE-2026-111181. Angular is updated to 22.2.3 (CLI/build 22.2.4); Angular 22.2 requires
+verify the installed Wolfi glibc package satisfies `glibc>=2.44-r8`. npm 12.2.2
+is build-time tooling only. The backend moves to axios 1.21.0. Angular is updated
+to 22.2.5 (CLI/build 22.2.6) and Vitest to 5.1.0; Angular 22.2 requires
 TypeScript `>=6.0 <6.1`, so TypeScript remains on compatible 6.0.3 rather than
-the incompatible 7.x major. The Angular frontend is built and tested before
-publishing; the runtime starts the backend explicitly with `node index.js`.
+the incompatible 7.x major, and jsdom stays on 30.x. The Angular frontend is built
+and tested before publishing; the runtime starts the backend explicitly with
+`node index.js`.
 
 The page layout now uses the full centred content width on desktop, aligns the
 overview copy with the workflow steps, and keeps step numbers inline on phones.
